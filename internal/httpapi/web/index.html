@@ -18,7 +18,7 @@
     </div>
     <header class="site-header">
       <div class="container masthead">
-        <a class="wordmark" href="/playground/" aria-label="The Journal home">The Journal<span class="wordmark-period">.</span></a>
+        <a class="wordmark" href="/" aria-label="The Journal home">The Journal<span class="wordmark-period">.</span></a>
         <span class="masthead-note">A place for useful stories<br>and fresh perspectives.</span>
       </div>
       <div class="nav-wrap">
@@ -61,6 +61,15 @@
         </div>
       </section>
 
+      <section id="articlePanel" class="panel article-page" hidden aria-label="Article">
+        <a class="article-back" href="/">← Back to all articles</a>
+        <article id="articleContent" class="full-article" aria-live="polite"></article>
+        <div id="relatedSection" class="related-section" hidden>
+          <div class="section-heading"><div><p class="overline">KEEP READING</p><h2>Related articles</h2></div></div>
+          <div id="relatedPosts" class="related-grid"></div>
+        </div>
+      </section>
+
       <section id="editorPanel" class="panel work-panel" hidden aria-labelledby="editorTitle">
         <div class="work-heading"><p class="overline">FOR EDITORS</p><h1 id="editorTitle">Edit the journal</h1><p>Create drafts, update articles and publish when they are ready.</p></div>
         <div class="token-card"><div><strong>Editor access</strong><p id="tokenStatus">Enter the admin token to work with drafts. It stays in this tab only.</p></div><div class="token-controls"><input id="tokenInput" type="password" placeholder="Admin token" autocomplete="off" aria-label="Admin token"><button id="connectToken" class="button button-primary" type="button">Connect</button><button id="disconnectToken" class="button button-light" type="button" hidden>Disconnect</button></div></div>
@@ -81,9 +90,8 @@
         </div>
       </section>
     </main>
-    <footer class="site-footer"><div class="container footer-inner"><a class="footer-brand" href="/playground/">The Journal<span>.</span></a><span>Stories, guides and updates.</span><button type="button" data-nav="editor">Editor access</button></div></footer>
+    <footer class="site-footer"><div class="container footer-inner"><a class="footer-brand" href="/">The Journal<span>.</span></a><span>Stories, guides and updates.</span><button type="button" data-nav="editor">Editor access</button></div></footer>
   </div>
-  <dialog id="articleDialog" class="article-dialog"><button id="closeArticle" class="dialog-close" type="button" aria-label="Close article">×</button><div id="articleContent"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

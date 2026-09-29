@@ -42,7 +42,7 @@ func New(db *storage.DB, cacheClient *cache.Cache, token, origin string, enableP
 	mux.HandleFunc("PATCH /admin/posts/{slug}", a.authorize(a.update))
 	mux.HandleFunc("DELETE /admin/posts/{slug}", a.authorize(a.delete))
 	if enablePlayground {
-		mountPlayground(mux)
+		mountPlayground(mux, db)
 	}
 	return a.middleware(mux)
 }

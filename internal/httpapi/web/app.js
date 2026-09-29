@@ -108,10 +108,15 @@ function showResponse(result) {
 }
 
 function navigate(section) {
+  if (location.pathname.startsWith('/stories/')) {
+    location.assign(`/${section === 'explore' ? '' : `#${section}`}`);
+    return;
+  }
   ['explore', 'editor', 'console'].forEach((name) => {
     $(`#${name}Panel`).hidden = name !== section;
     $$(`[data-nav="${name}"]`).forEach((item) => item.classList.toggle('active', name === section));
   });
+  history.replaceState(null, '', section === 'explore' ? '/' : `/#${section}`);
   if (section === 'editor' && state.token) loadAdminPosts();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -237,15 +242,17 @@ function renderPosts(posts) {
     label.className = 'lead-label';
     label.textContent = post.featured ? 'Featured story' : 'Latest story';
     const title = document.createElement('h2');
-    title.textContent = post.title;
+    const titleLink = document.createElement('a');
+    titleLink.href = articleURL(post.slug);
+    titleLink.textContent = post.title;
+    title.append(titleLink);
     const summary = document.createElement('p');
     summary.textContent = post.summary;
     const meta = storyMeta(post);
-    const read = document.createElement('button');
-    read.type = 'button';
+    const read = document.createElement('a');
+    read.href = articleURL(post.slug);
     read.className = 'read-link';
     read.textContent = 'Read the story →';
-    read.addEventListener('click', () => openArticle(post.slug));
     copy.append(label, title, summary, meta, read);
     lead.append(copy);
     if (post.cover_image) {
@@ -254,6 +261,7 @@ function renderPosts(posts) {
       const image = document.createElement('img');
       image.src = post.cover_image;
       image.alt = '';
+      image.addEventListener('error', () => { media.remove(); lead.classList.remove('has-image'); });
       media.append(image);
       lead.append(media);
     }
@@ -266,10 +274,9 @@ function renderPosts(posts) {
     grid.append(note);
   }
   remaining.forEach((post) => {
-    const row = document.createElement('article');
+    const row = document.createElement('a');
+    row.href = articleURL(post.slug);
     row.className = `post-row ${post.cover_image ? '' : 'no-image'}`;
-    row.tabIndex = 0;
-    row.setAttribute('role', 'button');
     row.setAttribute('aria-label', `Read ${post.title}`);
     const copy = document.createElement('div');
     const meta = storyMeta(post);
@@ -288,12 +295,15 @@ function renderPosts(posts) {
       image.src = post.cover_image;
       image.alt = '';
       image.loading = 'lazy';
+      image.addEventListener('error', () => { image.remove(); row.classList.add('no-image'); });
       row.append(image);
     }
-    row.addEventListener('click', () => openArticle(post.slug));
-    row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openArticle(post.slug); } });
     grid.append(row);
   });
+}
+
+function articleURL(slug) {
+  return `/stories/${encodeURIComponent(slug)}`;
 }
 
 function storyMeta(post) {
@@ -310,44 +320,94 @@ function storyMeta(post) {
   return meta;
 }
 
-async function openArticle(slug) {
+async function loadArticlePage(slug) {
+  $('#explorePanel').hidden = true;
+  $('#editorPanel').hidden = true;
+  $('#consolePanel').hidden = true;
+  $('#articlePanel').hidden = false;
+  $$('[data-nav]').forEach((item) => item.classList.remove('active'));
+  const root = $('#articleContent');
+  root.textContent = 'Loading article…';
   try {
     const { data: post } = await api('GET', `/posts/${encodeURIComponent(slug)}`);
-    const root = $('#articleContent');
     root.replaceChildren();
-    const wrap = document.createElement('div');
-    wrap.className = 'article-inner';
+    document.title = `${post.title} — The Journal`;
+    const header = document.createElement('header');
+    header.className = 'article-header';
     const category = document.createElement('span');
-    category.className = 'eyebrow';
+    category.className = 'overline';
     category.textContent = post.category;
-    const title = document.createElement('h2');
+    const title = document.createElement('h1');
     title.textContent = post.title;
     const summary = document.createElement('p');
     summary.className = 'summary';
     summary.textContent = post.summary;
-    const meta = document.createElement('p');
+    const meta = document.createElement('div');
     meta.className = 'article-meta';
     meta.textContent = `${post.author || 'Editorial Team'} · ${formatDate(post.published_at || post.created_at)}`;
-    wrap.append(category, title, summary, meta);
+    header.append(category, title, summary, meta);
+    root.append(header);
     if (post.cover_image) {
       const image = document.createElement('img');
+      image.className = 'article-cover';
       image.src = post.cover_image;
       image.alt = '';
-      wrap.append(image);
+      image.addEventListener('error', () => image.remove());
+      root.append(image);
     }
     const body = document.createElement('div');
-    body.className = 'body';
-    body.textContent = post.body;
-    wrap.append(body);
+    body.className = 'article-body';
+    post.body.split(/\n{2,}/).forEach((paragraph) => {
+      const p = document.createElement('p');
+      p.textContent = paragraph;
+      body.append(p);
+    });
+    root.append(body);
     if (post.tags?.length) {
       const tags = document.createElement('div');
       tags.className = 'article-tags';
       post.tags.forEach((tag) => { const chip = document.createElement('span'); chip.textContent = `#${tag}`; tags.append(chip); });
-      wrap.append(tags);
+      root.append(tags);
     }
-    root.append(wrap);
-    $('#articleDialog').showModal();
-  } catch (error) { toast(error.message, true); }
+    await loadRelated(slug);
+  } catch (error) {
+    document.title = 'Article unavailable — The Journal';
+    root.replaceChildren();
+    const heading = document.createElement('h1');
+    heading.textContent = 'This article is unavailable.';
+    const copy = document.createElement('p');
+    copy.textContent = error.message;
+    root.append(heading, copy);
+    $('#relatedSection').hidden = true;
+  }
+}
+
+async function loadRelated(slug) {
+  const section = $('#relatedSection');
+  const list = $('#relatedPosts');
+  section.hidden = true;
+  list.replaceChildren();
+  try {
+    const { data } = await api('GET', `/posts/${encodeURIComponent(slug)}/related?limit=3`, { track: false });
+    if (!data.posts.length) return;
+    data.posts.forEach((post) => {
+      const link = document.createElement('a');
+      link.href = articleURL(post.slug);
+      link.className = 'related-card';
+      const label = document.createElement('span');
+      label.className = 'overline';
+      label.textContent = post.category;
+      const title = document.createElement('h3');
+      title.textContent = post.title;
+      const more = document.createElement('span');
+      more.textContent = 'Read article →';
+      link.append(label, title, more);
+      list.append(link);
+    });
+    section.hidden = false;
+  } catch {
+    section.hidden = true;
+  }
 }
 
 function resetEditor() {
@@ -513,6 +573,10 @@ function bindEvents() {
   $$('[data-nav]').forEach((button) => button.addEventListener('click', () => navigate(button.dataset.nav)));
   $$('a[href="#latest"], a[href="#browse"]').forEach((link) => link.addEventListener('click', (event) => {
     event.preventDefault();
+    if (location.pathname.startsWith('/stories/')) {
+      location.assign(`/${link.getAttribute('href')}`);
+      return;
+    }
     navigate('explore');
     setTimeout(() => $(link.getAttribute('href')).scrollIntoView({ behavior: 'smooth' }), 0);
   }));
@@ -534,13 +598,17 @@ function bindEvents() {
   $('#publishPost').addEventListener('click', () => savePost('published'));
   $('#deletePost').addEventListener('click', deletePost);
   $('#requestForm').addEventListener('submit', sendConsoleRequest);
-  $('#closeArticle').addEventListener('click', () => $('#articleDialog').close());
-  $('#articleDialog').addEventListener('click', (event) => { if (event.target === $('#articleDialog')) $('#articleDialog').close(); });
 }
 
 bindEvents();
 resetEditor();
 $('#today').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 health();
-loadSummary();
-loadPosts();
+const articleMatch = location.pathname.match(/^\/stories\/([^/]+)$/);
+if (articleMatch) {
+  loadArticlePage(articleMatch[1]);
+} else {
+  if (location.hash === '#editor' || location.hash === '#console') navigate(location.hash.slice(1));
+  loadSummary();
+  loadPosts();
+}
