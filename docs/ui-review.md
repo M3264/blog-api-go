@@ -9,7 +9,7 @@ https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/comm
 
 ## internal/httpapi/web/styles.css
 - Fixed reduced-motion handling, explicit transition properties, input placeholder contrast, long-content wrapping and mobile control sizing.
-- Preserved visible focus and the incumbent burgundy/cream editorial identity.
+- Preserved visible focus and the new Offscript white/violet publication identity.
 - Sentence-case headings deliberately retain the publication's existing voice.
 
 ## internal/httpapi/web/app.js
