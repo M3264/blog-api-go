@@ -42,7 +42,7 @@ func run(logger *slog.Logger) error {
 	defer cacheClient.Close()
 	server := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           httpapi.New(db, cacheClient, cfg.AdminToken, cfg.AllowedOrigin, logger),
+		Handler:           httpapi.New(db, cacheClient, cfg.AdminToken, cfg.AllowedOrigin, cfg.EnablePlayground, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

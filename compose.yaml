@@ -8,6 +8,7 @@ services:
       BLOG_REDIS_URL: redis://redis:6379/0
       BLOG_CACHE_PREFIX: ${BLOG_CACHE_PREFIX:-blog-api}
       BLOG_ALLOWED_ORIGIN: ${BLOG_ALLOWED_ORIGIN:-}
+      BLOG_ENABLE_PLAYGROUND: ${BLOG_ENABLE_PLAYGROUND:-false}
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:

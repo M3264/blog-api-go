@@ -26,7 +26,7 @@ type API struct {
 	log    *slog.Logger
 }
 
-func New(db *storage.DB, cacheClient *cache.Cache, token, origin string, logger *slog.Logger) http.Handler {
+func New(db *storage.DB, cacheClient *cache.Cache, token, origin string, enablePlayground bool, logger *slog.Logger) http.Handler {
 	a := &API{db: db, cache: cacheClient, token: token, origin: origin, log: logger}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
@@ -41,6 +41,9 @@ func New(db *storage.DB, cacheClient *cache.Cache, token, origin string, logger 
 	mux.HandleFunc("POST /admin/posts", a.authorize(a.create))
 	mux.HandleFunc("PATCH /admin/posts/{slug}", a.authorize(a.update))
 	mux.HandleFunc("DELETE /admin/posts/{slug}", a.authorize(a.delete))
+	if enablePlayground {
+		mountPlayground(mux)
+	}
 	return a.middleware(mux)
 }
 

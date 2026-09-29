@@ -26,7 +26,7 @@ func setup(t *testing.T) (http.Handler, *storage.DB) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	return httpapi.New(db, nil, "test-secret-with-at-least-32-characters", "https://blog.example", slog.New(slog.NewTextHandler(io.Discard, nil))), db
+	return httpapi.New(db, nil, "test-secret-with-at-least-32-characters", "https://blog.example", false, slog.New(slog.NewTextHandler(io.Discard, nil))), db
 }
 
 func request(t *testing.T, h http.Handler, method, path string, auth bool, body any) *httptest.ResponseRecorder {
@@ -176,7 +176,7 @@ func TestRedisCacheInvalidatesAfterPublish(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	h := httpapi.New(db, client, "test-secret-with-at-least-32-characters", "", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h := httpapi.New(db, client, "test-secret-with-at-least-32-characters", "", false, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	create(t, h, "First published article", "published", "Guides", "Writing")
 	first := request(t, h, "GET", "/posts", false, nil)
 	if first.Code != 200 {

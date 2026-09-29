@@ -10,6 +10,7 @@ A Go backend for publishing articles. Editors create drafts, publish articles, a
 | `cmd/migrate-json` | One-time, repeatable import from the earlier JSON store |
 | `internal/blog` | Post model and validation |
 | `internal/httpapi` | HTTP routes, authentication, middleware |
+| `internal/httpapi/web` | Optional browser playground for public and editor routes |
 | `internal/storage` | PostgreSQL repository and embedded schema migrations |
 | `internal/cache` | Redis cache for published reads |
 | `openapi.yaml` | Machine readable API contract |
@@ -44,6 +45,7 @@ go build -o blog-api-go ./cmd/api
 | `BLOG_REDIS_URL` | empty | Redis connection URL; empty disables cache |
 | `BLOG_CACHE_PREFIX` | `blog-api` | Redis key namespace |
 | `BLOG_ALLOWED_ORIGIN` | empty | Exact browser origin allowed by CORS, such as `https://blog.example.com` |
+| `BLOG_ENABLE_PLAYGROUND` | `false` | Serve the browser playground at `/playground/` |
 
 The token is read at startup. Change it and restart the server to rotate it. Protect admin requests with HTTPS when the API is reachable outside localhost.
 
@@ -57,6 +59,12 @@ docker compose ps
 ```
 
 Compose binds only the API to `127.0.0.1:8080` on the host and stores PostgreSQL data in the `postgres-data` volume. PostgreSQL and Redis are reachable only on the Compose network. Put your HTTPS reverse proxy in front of the API port. The API container runs as a nonroot user with a read-only root filesystem and exposes `/ready` to its health check.
+
+## Browser playground
+
+Set `BLOG_ENABLE_PLAYGROUND=true` in `.env` before starting Compose, or export it when running the Go server directly. Open `http://127.0.0.1:8080/playground/` to browse published posts, search and filter them, and inspect API responses. The Editor tab lets you create drafts, edit, publish, unpublish, and delete posts. Paste the `BLOG_ADMIN_TOKEN` value from `.env` into the Editor tab to connect; the token stays in browser memory and is cleared on disconnect or reload. The API console can send custom requests to routes on the same server.
+
+The playground is off by default. Keep it disabled when you do not need browser testing, especially on a public deployment.
 
 ## API
 

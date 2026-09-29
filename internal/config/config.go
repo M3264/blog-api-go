@@ -3,15 +3,17 @@ package config
 import (
 	"errors"
 	"os"
+	"strconv"
 )
 
 type Config struct {
-	Addr          string
-	DatabaseURL   string
-	RedisURL      string
-	CachePrefix   string
-	AdminToken    string
-	AllowedOrigin string
+	Addr             string
+	DatabaseURL      string
+	RedisURL         string
+	CachePrefix      string
+	AdminToken       string
+	AllowedOrigin    string
+	EnablePlayground bool
 }
 
 func Load() (Config, error) {
@@ -22,6 +24,13 @@ func Load() (Config, error) {
 		CachePrefix:   env("BLOG_CACHE_PREFIX", "blog-api"),
 		AdminToken:    os.Getenv("BLOG_ADMIN_TOKEN"),
 		AllowedOrigin: os.Getenv("BLOG_ALLOWED_ORIGIN"),
+	}
+	if raw := os.Getenv("BLOG_ENABLE_PLAYGROUND"); raw != "" {
+		enabled, err := strconv.ParseBool(raw)
+		if err != nil {
+			return Config{}, errors.New("BLOG_ENABLE_PLAYGROUND must be true or false")
+		}
+		c.EnablePlayground = enabled
 	}
 	if len(c.AdminToken) < 32 {
 		return Config{}, errors.New("BLOG_ADMIN_TOKEN must be at least 32 characters")
