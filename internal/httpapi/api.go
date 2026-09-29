@@ -15,19 +15,27 @@ import (
 
 	"github.com/M3264/blog-api-go/internal/blog"
 	"github.com/M3264/blog-api-go/internal/cache"
+	"github.com/M3264/blog-api-go/internal/community"
 	"github.com/M3264/blog-api-go/internal/storage"
 )
 
 type API struct {
-	db     *storage.DB
-	cache  *cache.Cache
-	token  string
-	origin string
-	log    *slog.Logger
+	community *community.Service
+	db        *storage.DB
+	cache     *cache.Cache
+	token     string
+	origin    string
+	log       *slog.Logger
 }
 
 func New(db *storage.DB, cacheClient *cache.Cache, token, origin string, enablePlayground bool, logger *slog.Logger) http.Handler {
 	a := &API{db: db, cache: cacheClient, token: token, origin: origin, log: logger}
+	return a.routes(enablePlayground)
+}
+
+func (a *API) routes(enablePlayground bool) http.Handler {
+	cacheClient := a.cache
+	db := a.db
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("GET /ready", a.ready)
@@ -41,7 +49,9 @@ func New(db *storage.DB, cacheClient *cache.Cache, token, origin string, enableP
 	mux.HandleFunc("POST /admin/posts", a.authorize(a.create))
 	mux.HandleFunc("PATCH /admin/posts/{slug}", a.authorize(a.update))
 	mux.HandleFunc("DELETE /admin/posts/{slug}", a.authorize(a.delete))
-	if enablePlayground {
+	if a.community != nil {
+		a.mountWebsite(mux)
+	} else if enablePlayground {
 		mountPlayground(mux, db)
 	}
 	return a.middleware(mux)
@@ -57,6 +67,20 @@ func (a *API) ready(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) authorize(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if a.community != nil {
+			if u, e := a.current(r); e == nil && u.Role == "admin" && u.Verified {
+				if r.Method != "GET" && !a.validCSRF(r, u) {
+					writeError(w, 403, "invalid CSRF token")
+					return
+				}
+				next(w, r)
+				return
+			}
+			if !a.community.Config.Legacy {
+				writeError(w, 401, "admin login required")
+				return
+			}
+		}
 		header := r.Header.Get("Authorization")
 		provided := strings.TrimPrefix(header, "Bearer ")
 		if !strings.HasPrefix(header, "Bearer ") || len(provided) != len(a.token) || subtle.ConstantTimeCompare([]byte(provided), []byte(a.token)) != 1 {
@@ -225,7 +249,7 @@ func decodeInput(w http.ResponseWriter, r *http.Request) (blog.Input, bool) {
 }
 
 func emptyInput(in blog.Input) bool {
-	return in.Title == nil && in.Summary == nil && in.Body == nil && in.Category == nil && in.Author == nil && in.CoverImage == nil && in.Tags == nil && in.Featured == nil && in.Status == nil
+	return in.ClearSchedule == nil && in.Content == nil && in.ScheduledAt == nil && in.Title == nil && in.Summary == nil && in.Body == nil && in.Category == nil && in.Author == nil && in.CoverImage == nil && in.Tags == nil && in.Featured == nil && in.Status == nil
 }
 
 func parseFilter(w http.ResponseWriter, r *http.Request) (storage.Filter, bool) {

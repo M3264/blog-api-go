@@ -3,7 +3,19 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      BLOG_ADMIN_TOKEN: ${BLOG_ADMIN_TOKEN:?set BLOG_ADMIN_TOKEN}
+      BLOG_ADMIN_TOKEN: ${BLOG_ADMIN_TOKEN:-}
+      BLOG_LEGACY_ADMIN: ${BLOG_LEGACY_ADMIN:-false}
+      BLOG_SITE_URL: ${BLOG_SITE_URL:-http://localhost:8080}
+      BLOG_MEDIA_DIR: /app/media
+      BLOG_SMTP_ADDR: ${BLOG_SMTP_ADDR:-}
+      BLOG_SMTP_MODE: ${BLOG_SMTP_MODE:-starttls}
+      BLOG_SMTP_USER: ${BLOG_SMTP_USER:-}
+      BLOG_SMTP_PASSWORD: ${BLOG_SMTP_PASSWORD:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      BLOG_EMAIL_FROM: ${BLOG_EMAIL_FROM:-}
+      BLOG_INITIAL_ADMIN_EMAIL: ${BLOG_INITIAL_ADMIN_EMAIL:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       BLOG_ALLOW_SHORT_ADMIN_TOKEN: ${BLOG_ALLOW_SHORT_ADMIN_TOKEN:-false}
       BLOG_DATABASE_URL: postgres://blog:${BLOG_DB_PASSWORD:?set BLOG_DB_PASSWORD}@postgres:5432/blog?sslmode=disable
       BLOG_REDIS_URL: redis://redis:6379/0
@@ -17,6 +29,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - media-data:/app/media
     read_only: true
     tmpfs:
       - /tmp
@@ -57,3 +71,4 @@ services:
 
 volumes:
   postgres-data:
+  media-data:

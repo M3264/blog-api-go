@@ -15,3 +15,6 @@ Illustrative photographs, downloaded from Unsplash and served locally, apply onl
 - library.jpg: https://images.unsplash.com/photo-1497633762265-9d179a990aa6
 
 Database content and author-provided covers are unchanged.
+
+## Account navigation (September 29, 2026)
+21st.dev Account Menu / Dropdown Menu search informed the grouped profile, reading, notification, settings, and sign-out navigation. Retrieval of Origin UI Dropdown Menu (demo 392) returned `locked: true`; no source code was available. The accessible native HTML `<details>` account menu is an original implementation in Go templates. Existing Offscript typography, violet tokens, and the earlier Blog Cards adaptation are retained.

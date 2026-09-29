@@ -13,7 +13,7 @@ import (
 	"github.com/M3264/blog-api-go/internal/storage"
 )
 
-//go:embed web/*
+//go:embed web
 var playgroundFiles embed.FS
 
 func mountPlayground(mux *http.ServeMux, db *storage.DB) {

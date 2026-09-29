@@ -1,10 +1,14 @@
 openapi: 3.0.3
 info:
-  title: Blog API
-  version: 1.0.0
-  description: API for publishing articles. Public routes show published posts only.
+  title: Offscript API
+  version: 2.0.0
+  description: Public article APIs retain their URLs and plain-text body. Community
+    APIs use opaque cookie sessions. Mutations require X-CSRF-Token from GET /api/me
+    and verified readers for interactions. PostgreSQL is authoritative; Redis caches
+    public APIs only. Shared bearer administration is disabled unless explicitly enabled
+    for migration.
 servers:
-  - url: http://127.0.0.1:8080
+- url: http://127.0.0.1:8080
 paths:
   /health:
     get:
@@ -24,12 +28,12 @@ paths:
     get:
       summary: List published posts
       parameters:
-        - $ref: '#/components/parameters/Query'
-        - $ref: '#/components/parameters/Category'
-        - $ref: '#/components/parameters/Tag'
-        - $ref: '#/components/parameters/Featured'
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
+      - $ref: '#/components/parameters/Query'
+      - $ref: '#/components/parameters/Category'
+      - $ref: '#/components/parameters/Tag'
+      - $ref: '#/components/parameters/Featured'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
       responses:
         '200':
           $ref: '#/components/responses/PostPage'
@@ -39,7 +43,7 @@ paths:
     get:
       summary: Read a published post
       parameters:
-        - $ref: '#/components/parameters/Slug'
+      - $ref: '#/components/parameters/Slug'
       responses:
         '200':
           $ref: '#/components/responses/Post'
@@ -49,9 +53,9 @@ paths:
     get:
       summary: Find posts sharing category or tags
       parameters:
-        - $ref: '#/components/parameters/Slug'
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
+      - $ref: '#/components/parameters/Slug'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
       responses:
         '200':
           $ref: '#/components/responses/PostPage'
@@ -90,23 +94,28 @@ paths:
   /admin/posts:
     get:
       summary: List all posts
-      security: [{adminToken: []}]
+      security:
+      - Session: []
       parameters:
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [draft, published]
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - draft
+          - published
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
       responses:
         '200':
           $ref: '#/components/responses/PostPage'
         '401':
           $ref: '#/components/responses/Error'
+      description: Verified admin role required. Legacy bearer support is off by default.
     post:
       summary: Create a post
-      security: [{adminToken: []}]
+      security:
+      - Session: []
       requestBody:
         required: true
         content:
@@ -120,20 +129,31 @@ paths:
           $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
+      description: Verified admin role required. Legacy bearer support is off by default.
+      parameters:
+      - &id001
+        name: X-CSRF-Token
+        in: header
+        required: true
+        schema:
+          type: string
   /admin/posts/{slug}:
     parameters:
-      - $ref: '#/components/parameters/Slug'
+    - $ref: '#/components/parameters/Slug'
     get:
       summary: Read any post, including drafts
-      security: [{adminToken: []}]
+      security:
+      - Session: []
       responses:
         '200':
           $ref: '#/components/responses/Post'
         '404':
           $ref: '#/components/responses/Error'
+      description: Verified admin role required. Legacy bearer support is off by default.
     patch:
       summary: Update or publish a post
-      security: [{adminToken: []}]
+      security:
+      - Session: []
       requestBody:
         required: true
         content:
@@ -147,108 +167,1050 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
+      description: Verified admin role required. Legacy bearer support is off by default.
+      parameters:
+      - *id001
     delete:
       summary: Delete a post
-      security: [{adminToken: []}]
+      security:
+      - Session: []
       responses:
         '204':
           description: Deleted
         '404':
+          $ref: '#/components/responses/Error'
+      description: Verified admin role required. Legacy bearer support is off by default.
+      parameters:
+      - *id001
+  /api/auth/{action}:
+    post:
+      summary: Register, login, request recovery, or consume an account link
+      description: 'Actions: register, login, reset (request), recover (consume reset),
+        verify, setup. Registration always creates readers. Registration/reset return
+        202 without disclosing account existence; verification/setup/recovery consume
+        one-time, one-hour tokens. Password minimum 12 except login. Origin validation
+        and IP/email rate limits apply.'
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - name: action
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+  /api/me:
+    get:
+      summary: Current private account and CSRF token
+      description: ''
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+  /api/account/{action}:
+    post:
+      summary: Account settings and security
+      description: 'Actions: logout, revoke (all sessions), verify (resend), profile,
+        password (changes and revokes all sessions), subscription, notifications (mark
+        all read). See corresponding request schemas; empty actions accept {}.'
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: action
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+  /api/feed:
+    get:
+      summary: Private feed
+      description: 'Cache-Control: no-store. Scoped only to the signed-in user.'
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+  /api/bookmarks:
+    get:
+      summary: Private bookmarks
+      description: 'Cache-Control: no-store. Scoped only to the signed-in user.'
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+  /api/follows:
+    get:
+      summary: Private follows
+      description: 'Cache-Control: no-store. Scoped only to the signed-in user.'
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+  /api/notifications:
+    get:
+      summary: Private notifications
+      description: 'Cache-Control: no-store. Scoped only to the signed-in user.'
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+  /api/subscription:
+    get:
+      summary: Private subscription
+      description: 'Cache-Control: no-store. Scoped only to the signed-in user.'
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+  /api/stories/{slug}/comments:
+    get:
+      summary: Visible comments with one level of replies
+      description: Only published stories. Hidden or deleted comments expose a placeholder,
+        never their original body.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/stories/{slug}/like:
+    post:
+      summary: Add like
+      description: Verified, active reader required. Likes and bookmarks are idempotent;
+        comments publish immediately.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+    delete:
+      summary: Remove like
+      description: ''
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+  /api/stories/{slug}/bookmark:
+    post:
+      summary: Add bookmark
+      description: Verified, active reader required. Likes and bookmarks are idempotent;
+        comments publish immediately.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+    delete:
+      summary: Remove bookmark
+      description: ''
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+  /api/stories/{slug}/comment:
+    post:
+      summary: Add comment
+      description: Verified, active reader required. Likes and bookmarks are idempotent;
+        comments publish immediately.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+  /api/comments/{id}:
+    patch:
+      summary: Edit own visible comment
+      description: ''
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+    delete:
+      summary: Delete own comment
+      description: ''
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+  /api/comments/{id}/report:
+    post:
+      summary: Report abuse
+      description: ''
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportRequest'
+  /api/follows/{kind}/{target}:
+    post:
+      summary: Follow/unfollow author or topic
+      description: Verified reader required. kind is author or topic; target is the
+        exact display name, URL encoded.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: kind
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: target
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+    delete:
+      summary: Follow/unfollow author or topic
+      description: Verified reader required. kind is author or topic; target is the
+        exact display name, URL encoded.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: kind
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: target
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+  /api/admin/members:
+    get:
+      summary: Admin members
+      description: Verified admin role required. Lists limited to 100; members supports
+        q search.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+  /api/admin/moderation:
+    get:
+      summary: Admin moderation
+      description: Verified admin role required. Lists limited to 100; members supports
+        q search.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+  /api/admin/comments:
+    get:
+      summary: Admin comments
+      description: Verified admin role required. Lists limited to 100; members supports
+        q search.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+  /api/admin/newsletters:
+    get:
+      summary: Admin newsletters
+      description: Verified admin role required. Lists limited to 100; members supports
+        q search.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+  /api/admin/{action}:
+    post:
+      summary: Admin management action
+      description: 'Actions: member (role/suspended, protects last active admin),
+        invite (setup email), moderate (comment hidden), resolve (report), author
+        (name/bio/avatar), topic (name/description), retry-email (failed job). Verified
+        admin required.'
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: action
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRequest'
+  /api/admin/revisions/{slug}:
+    get:
+      summary: List revision snapshots
+      description: ''
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/admin/revisions/{slug}/{id}:
+    post:
+      summary: Restore revision as draft
+      description: ''
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+  /api/admin/uploads:
+    post:
+      summary: Upload and resize image
+      description: Verified admin required. JPEG/PNG/WebP, maximum 10 MB, 40 megapixels,
+        12000 pixels per side. Reencoded JPEG, max 2400 pixels per side. Returns 201
+        with URL, width and height.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      security:
+      - Session: []
+      parameters:
+      - *id001
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - image
+              properties:
+                image:
+                  type: string
+                  format: binary
+  /auth/google:
+    get:
+      summary: Start Google OpenID Connect sign-in
+      description: Redirects to Google. Authenticated linking uses link=true and csrf
+        query token. Google accounts are never linked by email alone. Uses state cookie,
+        nonce, PKCE, issuer/audience/signature validation.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /auth/google/callback:
+    get:
+      summary: Finish Google OpenID Connect sign-in
+      description: ''
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /rss.xml:
+    get:
+      summary: Public publication XML
+      description: ''
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /sitemap.xml:
+    get:
+      summary: Public publication XML
+      description: ''
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /unsubscribe:
+    get:
+      summary: Show unsubscribe confirmation
+      description: Opaque token in query. GET does not change preferences.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+    post:
+      summary: Unsubscribe from newsletters
+      description: Opaque token in form or query. Signed link is independent of session.
+        Supports one-click email headers.
+      responses:
+        '200':
+          description: Success (JSON unless described otherwise)
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
           $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     adminToken:
       type: http
       scheme: bearer
+    Session:
+      type: apiKey
+      in: cookie
+      name: offscript_session
   parameters:
     Slug:
       name: slug
       in: path
       required: true
-      schema: {type: string}
+      schema:
+        type: string
     Query:
       name: q
       in: query
-      schema: {type: string, maxLength: 200}
+      schema:
+        type: string
+        maxLength: 200
     Category:
       name: category
       in: query
-      schema: {type: string, maxLength: 50}
+      schema:
+        type: string
+        maxLength: 50
     Tag:
       name: tag
       in: query
-      schema: {type: string, maxLength: 30}
+      schema:
+        type: string
+        maxLength: 30
     Featured:
       name: featured
       in: query
-      schema: {type: boolean}
+      schema:
+        type: boolean
     Limit:
       name: limit
       in: query
-      schema: {type: integer, minimum: 1, maximum: 50, default: 10}
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
     Offset:
       name: offset
       in: query
-      schema: {type: integer, minimum: 0, default: 0}
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
   schemas:
     PostFields:
       type: object
       properties:
-        title: {type: string, minLength: 3, maxLength: 160}
-        summary: {type: string, minLength: 10, maxLength: 300}
-        body: {type: string, minLength: 20, maxLength: 100000}
-        category: {type: string, minLength: 2, maxLength: 50}
-        author: {type: string, maxLength: 100}
-        cover_image: {type: string, format: uri}
+        title:
+          type: string
+          minLength: 3
+          maxLength: 160
+        summary:
+          type: string
+          minLength: 10
+          maxLength: 300
+        body:
+          type: string
+          minLength: 20
+          maxLength: 100000
+        category:
+          type: string
+          minLength: 2
+          maxLength: 50
+        author:
+          type: string
+          maxLength: 100
+        cover_image:
+          type: string
+          format: uri
         tags:
           type: array
           maxItems: 10
           uniqueItems: true
-          items: {type: string, minLength: 2, maxLength: 30}
-        featured: {type: boolean, default: false}
-        status: {type: string, enum: [draft, published], default: draft}
+          items:
+            type: string
+            minLength: 2
+            maxLength: 30
+        featured:
+          type: boolean
+          default: false
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+          default: draft
+        content:
+          type: object
+          description: 'Validated Tiptap document. Allowed nodes: doc, paragraph,
+            text, heading (2–4), bulletList, orderedList, listItem, blockquote, codeBlock,
+            hardBreak, horizontalRule, image. Marks: bold, italic, underline, strike,
+            code, link. URLs allow approved http(s) links and https/local media images.
+            Plain-text body is derived from content.'
+        scheduled_at:
+          type: string
+          format: date-time
+          description: Schedule a draft for UTC publication.
+        clear_schedule:
+          type: boolean
+          description: Cancel a scheduled publication.
     PostInput:
       allOf:
-        - $ref: '#/components/schemas/PostFields'
-        - type: object
-          required: [title, summary, body, category]
+      - $ref: '#/components/schemas/PostFields'
+      - type: object
+        required:
+        - title
+        - summary
+        - category
+        anyOf:
+        - required:
+          - body
+        - required:
+          - content
     PostPatch:
       allOf:
-        - $ref: '#/components/schemas/PostFields'
-        - type: object
-          minProperties: 1
+      - $ref: '#/components/schemas/PostFields'
+      - type: object
+        minProperties: 1
     Post:
       allOf:
-        - $ref: '#/components/schemas/PostFields'
-        - type: object
-          required: [slug, title, summary, body, category, status, created_at, updated_at]
-          properties:
-            slug: {type: string}
-            created_at: {type: string, format: date-time}
-            updated_at: {type: string, format: date-time}
-            published_at: {type: string, format: date-time}
+      - $ref: '#/components/schemas/PostFields'
+      - type: object
+        required:
+        - slug
+        - title
+        - summary
+        - body
+        - category
+        - status
+        - created_at
+        - updated_at
+        properties:
+          slug:
+            type: string
+          created_at:
+            type: string
+            format: date-time
+          updated_at:
+            type: string
+            format: date-time
+          published_at:
+            type: string
+            format: date-time
     PostPage:
       type: object
-      required: [posts, total, limit, offset]
+      required:
+      - posts
+      - total
+      - limit
+      - offset
       properties:
         posts:
           type: array
           items:
             $ref: '#/components/schemas/Post'
-        total: {type: integer}
-        limit: {type: integer}
-        offset: {type: integer}
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
     TermCount:
       type: object
-      required: [name, count]
+      required:
+      - name
+      - count
       properties:
-        name: {type: string}
-        count: {type: integer}
+        name:
+          type: string
+        count:
+          type: integer
     Error:
       type: object
-      required: [error]
+      required:
+      - error
       properties:
-        error: {type: string}
+        error:
+          type: string
+    AuthRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          maxLength: 256
+        name:
+          type: string
+        token:
+          type: string
+      required: &id002 []
+      additionalProperties: false
+    ProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        bio:
+          type: string
+      required:
+      - name
+      additionalProperties: false
+    PasswordRequest:
+      type: object
+      properties:
+        current:
+          type: string
+        password:
+          type: string
+          minLength: 12
+          maxLength: 256
+      required:
+      - current
+      - password
+      additionalProperties: false
+    SubscriptionRequest:
+      type: object
+      properties:
+        frequency:
+          type: string
+          enum:
+          - 'off'
+          - immediate
+          - weekly
+        scope:
+          type: string
+          enum:
+          - all
+          - following
+      required:
+      - frequency
+      - scope
+      additionalProperties: false
+    CommentRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        parent_id:
+          type: integer
+          format: int64
+          nullable: true
+      required:
+      - body
+      additionalProperties: false
+    ReportRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 1000
+      required:
+      - reason
+      additionalProperties: false
+    AdminRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        bio:
+          type: string
+        avatar:
+          type: string
+        description:
+          type: string
+        role:
+          type: string
+          enum:
+          - reader
+          - admin
+        email:
+          type: string
+          format: email
+        suspended:
+          type: boolean
+        hidden:
+          type: boolean
+      required: *id002
+      additionalProperties: false
   responses:
     Post:
       description: Post

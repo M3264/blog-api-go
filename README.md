@@ -1,137 +1,87 @@
-# Blog API
+# Offscript
 
-A Go backend for publishing articles. Editors create drafts, publish articles, and organize them with categories, tags, and featured flags. Readers can search, filter, and find related articles. The API starts with no content.
+A Go blog and reader community with PostgreSQL as the authoritative store and Redis for public article caching and rate limits. Go serves complete HTML pages and embedded Vite assets; production needs one application service, PostgreSQL, and Redis.
 
-## Architecture
+Public reading and the existing article API remain available without login. Verified readers can comment/reply, like, save stories privately, follow authors/topics, read their feed, manage email preferences, and receive notifications. Verified admins manage posts, author profiles, topics, members, moderation, and email delivery. Reader accounts cannot publish.
 
-| Path | Responsibility |
-| --- | --- |
-| `cmd/api` | Server startup and graceful shutdown |
-| `cmd/migrate-json` | One-time, repeatable import from the earlier JSON store |
-| `internal/blog` | Post model and validation |
-| `internal/httpapi` | HTTP routes, authentication, middleware |
-| `internal/httpapi/web` | Optional browser playground for public and editor routes |
-| `internal/storage` | PostgreSQL repository and embedded schema migrations |
-| `internal/cache` | Redis cache for published reads |
-| `openapi.yaml` | Machine readable API contract |
-| `Dockerfile`, `compose.yaml` | API, PostgreSQL, and Redis deployment |
-| `.github/workflows/ci.yml` | Format, test, vet, and build gates |
+## Run
 
-PostgreSQL is the source of truth. Redis caches successful public reads for 30 seconds; writes increment a shared cache version so all API instances stop using old entries. If Redis is unavailable, reads fall through to PostgreSQL. Use a reverse proxy for HTTPS and back up the PostgreSQL volume.
+Copy `.env.example` to a private `.env` and set the database password and site origin. Configure SMTP (or Resend) and Google OAuth for real account email and Google sign-in. Start PostgreSQL/Redis and build the service:
 
-## Run locally
+```sh
+docker compose up -d --build
+```
 
-Requires Go 1.25 or newer and a PostgreSQL database. Redis is optional for local development.
+Local development with Go/Node:
 
-```bash
-export BLOG_ADMIN_TOKEN="$(openssl rand -hex 32)"
-export BLOG_DATABASE_URL='postgres://blog:password@127.0.0.1:5432/blog?sslmode=disable'
-export BLOG_REDIS_URL='redis://127.0.0.1:6379/0'
+```sh
+npm ci
+npm run typecheck
+npm run build
+docker compose -f compose.yaml -f compose.local.yaml up -d postgres redis
+# Supply BLOG_DATABASE_URL and BLOG_REDIS_URL through the environment.
 go run ./cmd/api
 ```
 
-The API listens at `http://127.0.0.1:8080`. To build a binary:
+`BLOG_SITE_URL` is the canonical origin; public origins must use HTTPS. Session cookies are Secure on HTTPS, HttpOnly, and SameSite=Lax. Passwords use Argon2id. Sessions and expiring one-time tokens are stored hashed. Mutating session requests require the CSRF token from `/api/me` (the website reads it from a meta tag). Redis rate limiting falls back to PostgreSQL during Redis outages. Private responses are never cached.
 
-```bash
-go build -o blog-api-go ./cmd/api
-./blog-api-go
+## Administration
+
+```sh
+docker compose run --rm api bootstrap-admin --email '<your initial admin email>'
 ```
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `BLOG_ADMIN_TOKEN` | required | At least 32 characters; bearer token for editor routes |
-| `BLOG_ALLOW_SHORT_ADMIN_TOKEN` | `false` | Permit a shorter token for local testing |
-| `BLOG_ADDR` | `127.0.0.1:8080` | Listening address |
-| `BLOG_DATABASE_URL` | required | PostgreSQL connection URL |
-| `BLOG_REDIS_URL` | empty | Redis connection URL; empty disables cache |
-| `BLOG_CACHE_PREFIX` | `blog-api` | Redis key namespace |
-| `BLOG_ALLOWED_ORIGIN` | empty | Exact browser origin allowed by CORS, such as `https://blog.example.com` |
-| `BLOG_ENABLE_PLAYGROUND` | `false` | Serve the blog UI at `/` and article pages at `/stories/{slug}` |
+The email flag defaults to private `BLOG_INITIAL_ADMIN_EMAIL` when set. The command also queues the setup link for email delivery. Use the printed or emailed private setup link within one hour. After password setup, sign in and use `/admin`. Additional admins are invited from Members. The last active admin is protected from removal/suspension. `BLOG_LEGACY_ADMIN=false` disables shared bearer administration, including the old browser token. The production website never serves the API console or playground navigation; legacy page URLs redirect to website pages.
 
-The token is read at startup. Change it and restart the server to rotate it. Protect admin requests with HTTPS when the API is reachable outside localhost.
-
-For a local browser test with a shorter token, set `BLOG_ALLOW_SHORT_ADMIN_TOKEN=true`. Keep the default `false` for a deployed editor. If you run the Go binary on the host while PostgreSQL and Redis run in Compose, use `docker compose -f compose.yaml -f compose.local.yaml up -d postgres redis` to bind their ports to localhost.
-
-## Run with Docker Compose
-
-Create `.env` from `.env.example`, set `BLOG_ADMIN_TOKEN` and `BLOG_DB_PASSWORD` to newly generated values, then run:
-
-```bash
-docker compose up --build -d
-docker compose ps
-```
-
-Compose binds only the API to `127.0.0.1:8080` on the host and stores PostgreSQL data in the `postgres-data` volume. PostgreSQL and Redis are reachable only on the Compose network. Put your HTTPS reverse proxy in front of the API port. The API container runs as a nonroot user with a read-only root filesystem and exposes `/ready` to its health check.
-
-## Browser playground
-
-Set `BLOG_ENABLE_PLAYGROUND=true` in `.env` before starting Compose, or export it when running the Go server directly. Open `http://127.0.0.1:8080/` to browse published posts, search and filter them, and inspect API responses. Each published article has a direct URL at `/stories/{slug}`. The Editor tab lets you create drafts, edit, publish, unpublish, and delete posts. Paste the `BLOG_ADMIN_TOKEN` value from `.env` into the Editor tab to connect; the token stays in browser memory and is cleared on disconnect or reload. The API console can send custom requests to routes on the same server.
-
-The playground is off by default. Keep it disabled when you do not need browser testing, especially on a public deployment.
+The Tiptap editor supports headings, lists, quotes, safe links, images, preview, autosaved drafts, server-side revisions, restoration as a draft, scheduling in UTC, and publish/unpublish. Structured content is validated against an allowlist and its plain-text equivalent remains in `body`. Existing slugs are preserved on edits. Image uploads accept JPEG, PNG and WebP up to 10 MB/40 megapixels, resize to 2400 pixels per side, and reencode as JPEG in the persistent media directory.
 
 ## API
 
-The full request and response contract is in [openapi.yaml](openapi.yaml). All responses are JSON except successful delete (204). Errors use `{"error":"message"}`. Public endpoints never return drafts.
+[OpenAPI](openapi.yaml) documents public, account, community, upload, and management endpoints.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Process health |
-| `GET` | `/ready` | Database readiness |
-| `GET` | `/posts` | Published posts; supports search and filters |
-| `GET` | `/posts/{slug}` | Published article |
-| `GET` | `/posts/{slug}/related` | Related published articles |
-| `GET` | `/categories` | Published article counts by category |
-| `GET` | `/tags` | Published article counts by tag |
-| `GET` | `/admin/posts` | Editor list, including drafts |
-| `GET` | `/admin/posts/{slug}` | Editor article detail |
-| `POST` | `/admin/posts` | Create a draft or published article |
-| `PATCH` | `/admin/posts/{slug}` | Edit, publish, or unpublish |
-| `DELETE` | `/admin/posts/{slug}` | Permanently delete |
+| Routes | Access |
+| --- | --- |
+| `/posts`, `/posts/{slug}`, `/posts/{slug}/related`, `/categories`, `/tags` | Public, Redis cached |
+| `/stories/{slug}`, `/`, `/search`, `/topics`, `/authors` | Public HTML |
+| `/api/auth/{action}` | Registration, login, verification/setup, recovery |
+| `/api/me`, `/api/account/{action}` | Signed-in account, private |
+| `/api/stories/{slug}/{action}`, `/api/comments/{id}`, `/api/follows/{kind}/{target}` | Verified readers, CSRF on mutations |
+| `/api/feed`, `/api/bookmarks`, `/api/follows`, `/api/notifications`, `/api/subscription` | Private, scoped to current user |
+| `/admin/posts`, `/admin/posts/{slug}` | Verified admin article management API |
+| `/api/admin/*` | Verified admin management, moderation, revisions, uploads |
+| `/auth/google`, `/auth/google/callback` | Google OIDC with state, nonce, PKCE and signed ID-token validation |
+| `/rss.xml`, `/sitemap.xml` | Public XML |
 
-`GET /posts` accepts `q`, `category`, `tag`, `featured=true|false`, `limit` (1–50, default 10), and `offset` (default 0). Filters can be combined. `GET /admin/posts` accepts `status=draft|published`, plus the same search and pagination filters. `GET /posts/{slug}/related` accepts `limit` and `offset`. List responses include `posts`, `total`, `limit`, and `offset`.
+Public post list filters retain `q`, `category`, `tag`, `featured`, `limit`, and `offset`; only published posts are returned. The original JSON import command remains idempotent:
 
-Admin routes require `Authorization: Bearer <BLOG_ADMIN_TOKEN>`.
-
-### Create and publish an article
-
-```bash
-curl -X POST http://127.0.0.1:8080/admin/posts \
-  -H "Authorization: Bearer $BLOG_ADMIN_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"title":"Planning your week","summary":"Practical ways to organize your time.","body":"Start by writing down deadlines, then reserve time for focused work, breaks, and review.","category":"Guides","author":"Editorial Team","tags":["Planning","Productivity"],"featured":true}'
-
-curl -X PATCH http://127.0.0.1:8080/admin/posts/planning-your-week \
-  -H "Authorization: Bearer $BLOG_ADMIN_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"status":"published"}'
+```sh
+go run ./cmd/migrate-json --from data/posts.json
 ```
 
-Then query `GET /posts?category=Guides&featured=true`. The server generates a stable slug and publication timestamp. Article bodies are plain text; a web client should render them as text or sanitize any formatting it adds.
+Author records represent bylines independently of reader login accounts. Google never links accounts solely by matching email; a signed-in linking flow is required. Suspension revokes sessions and prevents password/Google sign-in and community actions.
 
-## Import existing JSON posts
+## Email and Google configuration
 
-If an earlier version saved `data/posts.json`, copy or back it up and import it before switching traffic:
+`BLOG_EMAIL_FROM` controls the sender independently of the admin email. For the host-local Postfix relay, use `BLOG_SMTP_ADDR=127.0.0.1:25` and `BLOG_SMTP_MODE=local`. That relay listens only on loopback and signs mail with OpenDKIM. Remote relays require `starttls` (default) or `tls` plus `BLOG_SMTP_USER`/`BLOG_SMTP_PASSWORD` if authentication is required. SMTP takes precedence over Resend; leaving its address blank uses `RESEND_API_KEY`. See [SMTP setup](docs/smtp.md) for deployment boundaries and DNS requirements.
 
-```bash
-BLOG_DATABASE_URL='postgres://blog:password@127.0.0.1:5432/blog?sslmode=disable' \
-  go run ./cmd/migrate-json -from data/posts.json
-```
+Create a project in [Google Cloud](https://console.cloud.google.com/), configure Google Auth Platform Branding/Audience, then create a Web application client under Clients. Register `https://blog.kennyy.tech/auth/google/callback` exactly as an authorized redirect URI. Store its client ID and secret privately as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Testing audiences must include the users who will sign in; configure a production audience before public launch. Offscript requests only `openid email profile`; Google account linking requires an existing signed-in account. [Google instructions](https://developers.google.com/identity/openid-connect/openid-connect).
 
-For the Compose deployment, where PostgreSQL is not exposed to the host:
+## Worker, storage, rollout
 
-```bash
-docker compose run --rm -v "$PWD/data/posts.json:/tmp/posts.json:ro" \
-  api /usr/local/bin/migrate-json -from /tmp/posts.json
-```
+The API runs scheduled publishing and a PostgreSQL-backed durable outbox worker every 30 seconds. `go run ./cmd/worker` supports a dedicated worker process. Immediate publication emails are deduplicated by article/recipient; edits do not resend them. Friday 09:00 UTC digests match all stories or followed authors/topics and skip empty results. Notification badges refresh once a minute while the tab is visible. Subscriptions and bookmarks are private.
 
-The import runs in a transaction, skips slugs already in PostgreSQL, and leaves the source JSON untouched. It is safe to rerun. Verify the imported count with `GET /admin/posts` before switching traffic. If you need to roll back, stop the new server and run the old version against the original JSON file; edits made only in PostgreSQL will need to be exported separately.
+Back up PostgreSQL and uploaded media together. Redis is disposable. [Rollout instructions](docs/rollout.md) cover configuration, bootstrap, backup/restore, live verification, disabling token access, and rollback. Live launch requires actual email delivery, Google console configuration and the user-supplied initial admin email.
 
-## Operations and verification
+## Verification
 
-```bash
-go test ./...
+```sh
+npm run typecheck
+npm run build
+TEST_DATABASE_URL='postgres://…' TEST_REDIS_URL='redis://127.0.0.1:6379/0' go test ./...
 go vet ./...
-go build -o blog-api-go ./cmd/api
+go build ./cmd/api
 ```
 
-Set `TEST_DATABASE_URL` and `TEST_REDIS_URL` to run integration tests against isolated PostgreSQL schemas and a namespaced Redis cache. CI starts both services and runs the full suite. Use `pg_dump` or a managed PostgreSQL backup for the database. Redis is disposable cache data. The API logs structured request records without logging the admin token.
+Database integration tests create isolated schemas and clean up after themselves. They cover the retained API and legacy import, accounts, permissions, CSRF, recovery/revocation, OIDC linking/nonce/state, private-data isolation, moderation, replies, scheduling, revisions, hostile content, uploads, newsletter matching, retries and deduplication. Redis cache tests use a random namespace.
+
+`tests/preview.go` is an explicitly isolated fictional-data preview helper. With that preview running, `npm run test:browser` exercises guest, reader and admin journeys at desktop/mobile sizes and captures screenshots. Never run the preview helper against the production schema. Browser tests cover UI behavior; mocked provider tests do not prove live Google/mail configuration.

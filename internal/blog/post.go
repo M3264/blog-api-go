@@ -1,6 +1,7 @@
 package blog
 
 import (
+	"encoding/json"
 	"errors"
 	"net/url"
 	"regexp"
@@ -10,31 +11,36 @@ import (
 )
 
 type Post struct {
-	Slug        string     `json:"slug"`
-	Title       string     `json:"title"`
-	Summary     string     `json:"summary"`
-	Body        string     `json:"body"`
-	Category    string     `json:"category"`
-	Author      string     `json:"author,omitempty"`
-	CoverImage  string     `json:"cover_image,omitempty"`
-	Tags        []string   `json:"tags"`
-	Featured    bool       `json:"featured"`
-	Status      string     `json:"status"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	PublishedAt *time.Time `json:"published_at,omitempty"`
+	Content     json.RawMessage `json:"content,omitempty"`
+	ScheduledAt *time.Time      `json:"scheduled_at,omitempty"`
+	Slug        string          `json:"slug"`
+	Title       string          `json:"title"`
+	Summary     string          `json:"summary"`
+	Body        string          `json:"body"`
+	Category    string          `json:"category"`
+	Author      string          `json:"author,omitempty"`
+	CoverImage  string          `json:"cover_image,omitempty"`
+	Tags        []string        `json:"tags"`
+	Featured    bool            `json:"featured"`
+	Status      string          `json:"status"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	PublishedAt *time.Time      `json:"published_at,omitempty"`
 }
 
 type Input struct {
-	Title      *string   `json:"title"`
-	Summary    *string   `json:"summary"`
-	Body       *string   `json:"body"`
-	Category   *string   `json:"category"`
-	Author     *string   `json:"author"`
-	CoverImage *string   `json:"cover_image"`
-	Tags       *[]string `json:"tags"`
-	Featured   *bool     `json:"featured"`
-	Status     *string   `json:"status"`
+	ClearSchedule *bool            `json:"clear_schedule"`
+	Content       *json.RawMessage `json:"content"`
+	ScheduledAt   *time.Time       `json:"scheduled_at"`
+	Title         *string          `json:"title"`
+	Summary       *string          `json:"summary"`
+	Body          *string          `json:"body"`
+	Category      *string          `json:"category"`
+	Author        *string          `json:"author"`
+	CoverImage    *string          `json:"cover_image"`
+	Tags          *[]string        `json:"tags"`
+	Featured      *bool            `json:"featured"`
+	Status        *string          `json:"status"`
 }
 
 type ValidationError struct{ Message string }
@@ -43,13 +49,29 @@ func (e ValidationError) Error() string { return e.Message }
 
 func (in Input) Apply(post *Post, now time.Time) error {
 	previous := post.Status
+	if in.ClearSchedule != nil && *in.ClearSchedule {
+		post.ScheduledAt = nil
+	}
+	if in.Content != nil {
+		_, text, err := RenderContent(*in.Content, "")
+		if err != nil {
+			return ValidationError{err.Error()}
+		}
+		post.Content = *in.Content
+		post.Body = text
+	}
+	if in.ScheduledAt != nil {
+		post.ScheduledAt = in.ScheduledAt
+		post.Status = "draft"
+	}
 	if in.Title != nil {
 		post.Title = strings.TrimSpace(*in.Title)
 	}
 	if in.Summary != nil {
 		post.Summary = strings.TrimSpace(*in.Summary)
 	}
-	if in.Body != nil {
+	if in.Body != nil && in.Content == nil {
+		post.Content = nil
 		post.Body = strings.TrimSpace(*in.Body)
 	}
 	if in.Category != nil {
@@ -82,6 +104,9 @@ func (in Input) Apply(post *Post, now time.Time) error {
 	} else if post.Status == "draft" {
 		post.PublishedAt = nil
 	}
+	if post.Status == "published" {
+		post.ScheduledAt = nil
+	}
 	post.UpdatedAt = now.UTC()
 	return nil
 }
@@ -105,6 +130,10 @@ func (p Post) Validate() error {
 	}
 	if p.CoverImage != "" {
 		u, err := url.Parse(p.CoverImage)
+		if strings.HasPrefix(p.CoverImage, "/media/") && SafeURL(p.CoverImage, true) {
+			u.Scheme = "https"
+			u.Host = "local"
+		}
 		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
 			return errors.New("cover_image must be an absolute HTTP or HTTPS URL")
 		}

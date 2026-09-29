@@ -1,0 +1,21 @@
+[Unit]
+Description=Offscript blog and community
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/blog-api-go
+EnvironmentFile=/home/ubuntu/blog-api-go/.env
+EnvironmentFile=/home/ubuntu/blog-api-go/data/production.env
+ExecStart=/home/ubuntu/blog-api-go/bin/offscript-api
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/blog-api-go/data/media
+
+[Install]
+WantedBy=multi-user.target

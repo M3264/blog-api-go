@@ -95,15 +95,16 @@ func (s *DB) migrate(ctx context.Context) error {
 	return tx.Commit()
 }
 
-const postColumns = `slug,title,summary,body,category,author,cover_image,tags_json::text,featured,status,created_at,updated_at,published_at`
+const postColumns = `slug,title,summary,body,category,author,cover_image,tags_json::text,featured,status,created_at,updated_at,published_at,content,scheduled_at`
 
 type scanner interface{ Scan(...any) error }
 
 func scanPost(row scanner) (blog.Post, error) {
 	var p blog.Post
 	var tags string
-	var published sql.NullTime
-	err := row.Scan(&p.Slug, &p.Title, &p.Summary, &p.Body, &p.Category, &p.Author, &p.CoverImage, &tags, &p.Featured, &p.Status, &p.CreatedAt, &p.UpdatedAt, &published)
+	var content []byte
+	var published, scheduled sql.NullTime
+	err := row.Scan(&p.Slug, &p.Title, &p.Summary, &p.Body, &p.Category, &p.Author, &p.CoverImage, &tags, &p.Featured, &p.Status, &p.CreatedAt, &p.UpdatedAt, &published, &content, &scheduled)
 	if err != nil {
 		return p, err
 	}
@@ -112,6 +113,10 @@ func scanPost(row scanner) (blog.Post, error) {
 	}
 	if p.Tags == nil {
 		p.Tags = []string{}
+	}
+	p.Content = json.RawMessage(content)
+	if scheduled.Valid {
+		p.ScheduledAt = &scheduled.Time
 	}
 	if published.Valid {
 		t := published.Time.UTC()
@@ -146,9 +151,9 @@ func insert(ctx context.Context, tx *sql.Tx, p blog.Post) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return tx.ExecContext(ctx, `INSERT INTO posts (slug,title,summary,body,category,author,cover_image,tags_json,featured,status,created_at,updated_at,published_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13) ON CONFLICT (slug) DO NOTHING`,
-		p.Slug, p.Title, p.Summary, p.Body, p.Category, p.Author, p.CoverImage, string(tags), p.Featured, p.Status, p.CreatedAt, p.UpdatedAt, p.PublishedAt)
+	return tx.ExecContext(ctx, `INSERT INTO posts (slug,title,summary,body,category,author,cover_image,tags_json,featured,status,created_at,updated_at,published_at,content,scheduled_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT (slug) DO NOTHING`,
+		p.Slug, p.Title, p.Summary, p.Body, p.Category, p.Author, p.CoverImage, string(tags), p.Featured, p.Status, p.CreatedAt, p.UpdatedAt, p.PublishedAt, nullableJSON(p.Content), p.ScheduledAt)
 }
 
 func (s *DB) Create(ctx context.Context, p blog.Post) (blog.Post, error) {
@@ -172,6 +177,9 @@ func (s *DB) Create(ctx context.Context, p blog.Post) (blog.Post, error) {
 			return p, err
 		}
 		if count == 1 {
+			if err := recordPost(ctx, tx, p); err != nil {
+				return p, err
+			}
 			return p, tx.Commit()
 		}
 	}
@@ -188,6 +196,9 @@ func (s *DB) Update(ctx context.Context, slug string, input blog.Input, now time
 	if err != nil {
 		return p, err
 	}
+	if err := saveRevision(ctx, tx, p); err != nil {
+		return p, err
+	}
 	if err := input.Apply(&p, now); err != nil {
 		return p, err
 	}
@@ -195,9 +206,12 @@ func (s *DB) Update(ctx context.Context, slug string, input blog.Input, now time
 	if err != nil {
 		return p, err
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE posts SET title=$1,summary=$2,body=$3,category=$4,author=$5,cover_image=$6,tags_json=$7::jsonb,featured=$8,status=$9,updated_at=$10,published_at=$11 WHERE slug=$12`,
-		p.Title, p.Summary, p.Body, p.Category, p.Author, p.CoverImage, string(tags), p.Featured, p.Status, p.UpdatedAt, p.PublishedAt, p.Slug)
+	_, err = tx.ExecContext(ctx, `UPDATE posts SET title=$1,summary=$2,body=$3,category=$4,author=$5,cover_image=$6,tags_json=$7::jsonb,featured=$8,status=$9,updated_at=$10,published_at=$11,content=$13,scheduled_at=$14 WHERE slug=$12`,
+		p.Title, p.Summary, p.Body, p.Category, p.Author, p.CoverImage, string(tags), p.Featured, p.Status, p.UpdatedAt, p.PublishedAt, p.Slug, nullableJSON(p.Content), p.ScheduledAt)
 	if err != nil {
+		return p, err
+	}
+	if err := recordPost(ctx, tx, p); err != nil {
 		return p, err
 	}
 	return p, tx.Commit()
@@ -374,4 +388,31 @@ func (s *DB) ImportJSON(ctx context.Context, data []byte) (int, error) {
 		inserted += int(count)
 	}
 	return inserted, tx.Commit()
+}
+
+// SQL supplies the authoritative connection to the account and worker services.
+func (s *DB) SQL() *sql.DB { return s.sql }
+
+func nullableJSON(b json.RawMessage) any {
+	if len(b) == 0 {
+		return nil
+	}
+	return string(b)
+}
+func saveRevision(ctx context.Context, tx *sql.Tx, p blog.Post) error {
+	b, e := json.Marshal(p)
+	if e != nil {
+		return e
+	}
+	_, e = tx.ExecContext(ctx, `INSERT INTO post_revisions(slug,snapshot) VALUES($1,$2::jsonb)`, p.Slug, string(b))
+	return e
+}
+func recordPost(ctx context.Context, tx *sql.Tx, p blog.Post) error {
+	if p.Author != "" {
+		if _, e := tx.ExecContext(ctx, `INSERT INTO authors(name) VALUES($1) ON CONFLICT DO NOTHING`, p.Author); e != nil {
+			return e
+		}
+	}
+	_, e := tx.ExecContext(ctx, `INSERT INTO topics(name) VALUES($1) ON CONFLICT DO NOTHING`, p.Category)
+	return e
 }

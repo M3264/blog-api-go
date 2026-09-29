@@ -5,3 +5,9 @@ bin/
 *.db
 *.db-shm
 *.db-wal
+
+node_modules/
+.impeccable/review/
+internal/httpapi/web/chunks/
+internal/httpapi/web/site.js
+backups/

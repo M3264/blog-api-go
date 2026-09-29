@@ -1,0 +1,20 @@
+{
+  "name": "offscript",
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test:browser": "node tests/browser.mjs"
+  },
+  "dependencies": {
+    "@tiptap/core": "^3.0.0",
+    "@tiptap/pm": "^3.0.0",
+    "@tiptap/starter-kit": "^3.0.0",
+    "@tiptap/extension-image": "^3.0.0"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0",
+    "typescript": "^5.9.0",
+    "@playwright/test": "^1.55.0"
+  }
+}

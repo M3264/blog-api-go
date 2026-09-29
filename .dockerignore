@@ -6,3 +6,7 @@ data
 *.db-shm
 *.db-wal
 blog-api-go
+
+node_modules
+.impeccable
+tests

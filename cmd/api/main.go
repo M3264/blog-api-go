@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/M3264/blog-api-go/internal/cache"
+	"github.com/M3264/blog-api-go/internal/community"
 	"github.com/M3264/blog-api-go/internal/config"
 	"github.com/M3264/blog-api-go/internal/httpapi"
 	"github.com/M3264/blog-api-go/internal/storage"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -40,9 +42,19 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer cacheClient.Close()
+	svc := &community.Service{DB: db.SQL(), Config: cfg.Community}
+	if cfg.RedisURL != "" {
+		opts, e := redis.ParseURL(cfg.RedisURL)
+		if e != nil {
+			return e
+		}
+		svc.Redis = redis.NewClient(opts)
+		defer svc.Redis.Close()
+	}
+	go svc.Run(ctx, logger, cacheClient.Invalidate)
 	server := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           httpapi.New(db, cacheClient, cfg.AdminToken, cfg.AllowedOrigin, cfg.EnablePlayground, logger),
+		Handler:           httpapi.NewWebsite(db, cacheClient, svc, cfg.AdminToken, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
