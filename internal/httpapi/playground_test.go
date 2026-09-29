@@ -23,7 +23,7 @@ func TestPlaygroundIsOptInAndServesAssets(t *testing.T) {
 	}
 	handler := httpapi.New(nil, nil, "test-secret-with-at-least-32-characters", "", true, logger)
 	page := request(handler, "/playground/")
-	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "Blog API") || page.Header().Get("Content-Security-Policy") == "" {
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "The Journal") || !strings.Contains(page.Body.String(), "id=\"leadPost\"") || page.Header().Get("Content-Security-Policy") == "" {
 		t.Fatalf("playground page: %d %s", page.Code, page.Body.String())
 	}
 	for _, asset := range []string{"/playground/app.js", "/playground/styles.css"} {

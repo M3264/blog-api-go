@@ -110,9 +110,8 @@ function showResponse(result) {
 function navigate(section) {
   ['explore', 'editor', 'console'].forEach((name) => {
     $(`#${name}Panel`).hidden = name !== section;
-    $(`[data-nav="${name}"]`).classList.toggle('active', name === section);
+    $$(`[data-nav="${name}"]`).forEach((item) => item.classList.toggle('active', name === section));
   });
-  $('#sectionName').textContent = section === 'console' ? 'API CONSOLE' : section.toUpperCase();
   if (section === 'editor' && state.token) loadAdminPosts();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -121,10 +120,10 @@ async function health() {
   try {
     await api('GET', '/ready', { track: false });
     $('#healthDot').className = 'status-dot online';
-    $('#healthText').textContent = 'API connected';
+    $('#healthText').textContent = 'Site connected';
   } catch {
     $('#healthDot').className = 'status-dot offline';
-    $('#healthText').textContent = 'API unavailable';
+    $('#healthText').textContent = 'Site unavailable';
   }
 }
 
@@ -142,11 +141,32 @@ async function loadSummary() {
       api('GET', '/categories', { track: false }),
       api('GET', '/tags', { track: false }),
     ]);
-    $('#publishedCount').textContent = posts.data.total;
-    $('#categoryCount').textContent = categories.data.categories.length;
-    $('#tagCount').textContent = tags.data.tags.length;
+    $('#articleCount').textContent = posts.data.total;
     setSelectOptions($('#categoryFilter'), categories.data.categories, 'All categories');
     setSelectOptions($('#tagFilter'), tags.data.tags, 'All tags');
+    const topicList = $('#topicList');
+    topicList.replaceChildren();
+    if (!categories.data.categories.length) {
+      const empty = document.createElement('span');
+      empty.textContent = 'Topics will appear as articles are published.';
+      topicList.append(empty);
+    }
+    categories.data.categories.forEach((item) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      const name = document.createElement('span');
+      name.textContent = item.name;
+      const count = document.createElement('span');
+      count.textContent = item.count;
+      button.append(name, count);
+      button.addEventListener('click', () => {
+        $('#categoryFilter').value = item.name;
+        state.page = 0;
+        loadPosts();
+        $('#latest').scrollIntoView({ behavior: 'smooth' });
+      });
+      topicList.append(button);
+    });
   } catch (error) {
     toast(error.message, true);
   }
@@ -161,6 +181,7 @@ async function loadPosts() {
   if ($('#featuredFilter').checked) params.set('featured', 'true');
   const grid = $('#postGrid');
   grid.replaceChildren();
+  $('#leadPost').replaceChildren();
   const loading = document.createElement('div');
   loading.className = 'empty-state';
   loading.textContent = 'Loading articles…';
@@ -184,30 +205,6 @@ async function loadPosts() {
   }
 }
 
-function coverFor(post, index, heightClass = '') {
-  const cover = document.createElement('div');
-  cover.className = `card-cover ${['', 'alternate', 'third'][index % 3]} ${heightClass}`;
-  if (post.cover_image) {
-    const image = document.createElement('img');
-    image.src = post.cover_image;
-    image.alt = '';
-    image.loading = 'lazy';
-    cover.append(image);
-  } else {
-    const letter = document.createElement('span');
-    letter.className = 'cover-letter';
-    letter.textContent = post.title.charAt(0).toUpperCase();
-    cover.append(letter);
-  }
-  if (post.featured) {
-    const label = document.createElement('span');
-    label.className = 'featured-pill';
-    label.textContent = '✳ FEATURED';
-    cover.append(label);
-  }
-  return cover;
-}
-
 function formatDate(value) {
   if (!value) return 'Recently';
   const date = new Date(value);
@@ -216,7 +213,9 @@ function formatDate(value) {
 
 function renderPosts(posts) {
   const grid = $('#postGrid');
+  const lead = $('#leadPost');
   grid.replaceChildren();
+  lead.replaceChildren();
   if (!posts.length) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
@@ -224,47 +223,91 @@ function renderPosts(posts) {
     title.textContent = state.total ? 'No more articles here.' : 'Nothing published here yet.';
     const copy = document.createElement('p');
     copy.textContent = 'Try another filter or create your first post in the Editor.';
-    const action = document.createElement('button');
-    action.type = 'button';
-    action.className = 'button button-outline';
-    action.textContent = 'Open editor ↗';
-    action.addEventListener('click', () => navigate('editor'));
-    empty.append(title, copy, action);
+    empty.append(title, copy);
     grid.append(empty);
     return;
   }
-  posts.forEach((post, index) => {
-    const card = document.createElement('article');
-    card.className = 'post-card';
-    card.tabIndex = 0;
-    card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', `Open ${post.title}`);
-    const body = document.createElement('div');
-    body.className = 'post-card-body';
-    const meta = document.createElement('div');
-    meta.className = 'post-meta';
-    const category = document.createElement('span');
-    category.className = 'post-category';
-    category.textContent = post.category;
-    const date = document.createElement('span');
-    date.textContent = formatDate(post.published_at || post.created_at);
-    meta.append(category, date);
+  if (state.page === 0) {
+    const post = posts[0];
+    if (post.cover_image) lead.classList.add('has-image');
+    else lead.classList.remove('has-image');
+    const copy = document.createElement('div');
+    copy.className = 'lead-copy';
+    const label = document.createElement('span');
+    label.className = 'lead-label';
+    label.textContent = post.featured ? 'Featured story' : 'Latest story';
+    const title = document.createElement('h2');
+    title.textContent = post.title;
+    const summary = document.createElement('p');
+    summary.textContent = post.summary;
+    const meta = storyMeta(post);
+    const read = document.createElement('button');
+    read.type = 'button';
+    read.className = 'read-link';
+    read.textContent = 'Read the story →';
+    read.addEventListener('click', () => openArticle(post.slug));
+    copy.append(label, title, summary, meta, read);
+    lead.append(copy);
+    if (post.cover_image) {
+      const media = document.createElement('div');
+      media.className = 'lead-media';
+      const image = document.createElement('img');
+      image.src = post.cover_image;
+      image.alt = '';
+      media.append(image);
+      lead.append(media);
+    }
+  }
+  const remaining = state.page === 0 ? posts.slice(1) : posts;
+  if (!remaining.length) {
+    const note = document.createElement('p');
+    note.className = 'empty-state';
+    note.textContent = 'More articles will appear here soon.';
+    grid.append(note);
+  }
+  remaining.forEach((post) => {
+    const row = document.createElement('article');
+    row.className = `post-row ${post.cover_image ? '' : 'no-image'}`;
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    row.setAttribute('aria-label', `Read ${post.title}`);
+    const copy = document.createElement('div');
+    const meta = storyMeta(post);
     const title = document.createElement('h3');
     title.textContent = post.title;
     const summary = document.createElement('p');
     summary.textContent = post.summary;
-    const more = document.createElement('div');
-    more.className = 'read-more';
-    more.textContent = 'Read article';
-    const arrow = document.createElement('span');
-    arrow.textContent = '↗';
-    more.append(arrow);
-    body.append(meta, title, summary, more);
-    card.append(coverFor(post, index), body);
-    card.addEventListener('click', () => openArticle(post.slug));
-    card.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openArticle(post.slug); } });
-    grid.append(card);
+    const more = document.createElement('span');
+    more.className = 'read-link';
+    more.textContent = 'Read article →';
+    copy.append(meta, title, summary, more);
+    row.append(copy);
+    if (post.cover_image) {
+      const image = document.createElement('img');
+      image.className = 'post-row-media';
+      image.src = post.cover_image;
+      image.alt = '';
+      image.loading = 'lazy';
+      row.append(image);
+    }
+    row.addEventListener('click', () => openArticle(post.slug));
+    row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openArticle(post.slug); } });
+    grid.append(row);
   });
+}
+
+function storyMeta(post) {
+  const meta = document.createElement('div');
+  meta.className = 'story-meta';
+  const category = document.createElement('span');
+  category.className = 'category';
+  category.textContent = post.category;
+  const divider = document.createElement('span');
+  divider.textContent = '·';
+  const date = document.createElement('span');
+  date.textContent = formatDate(post.published_at || post.created_at);
+  meta.append(category, divider, date);
+  return meta;
 }
 
 async function openArticle(slug) {
@@ -468,7 +511,11 @@ async function sendConsoleRequest(event) {
 
 function bindEvents() {
   $$('[data-nav]').forEach((button) => button.addEventListener('click', () => navigate(button.dataset.nav)));
-  $('#newPostShortcut').addEventListener('click', () => { resetEditor(); navigate('editor'); });
+  $$('a[href="#latest"], a[href="#browse"]').forEach((link) => link.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate('explore');
+    setTimeout(() => $(link.getAttribute('href')).scrollIntoView({ behavior: 'smooth' }), 0);
+  }));
   $('#refreshPublic').addEventListener('click', () => { health(); loadSummary(); loadPosts(); });
   $('#filters').addEventListener('submit', (event) => event.preventDefault());
   let searchTimer;
@@ -493,6 +540,7 @@ function bindEvents() {
 
 bindEvents();
 resetEditor();
+$('#today').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 health();
 loadSummary();
 loadPosts();

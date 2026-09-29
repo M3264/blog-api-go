@@ -4,86 +4,85 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>Blog API · Playground</title>
+  <title>The Journal — Stories and updates</title>
   <link rel="stylesheet" href="/playground/styles.css">
   <script type="module" src="/playground/app.js"></script>
 </head>
 <body>
-  <div class="shell">
-    <aside class="sidebar">
-      <a class="brand" href="/playground/" aria-label="Blog API playground home">
-        <span class="brand-mark">B<span class="brand-dot">.</span></span>
-        <span class="brand-name">Blog API <small>PLAYGROUND</small></span>
-      </a>
-      <div class="sidebar-label">WORKSPACE</div>
-      <nav class="nav" aria-label="Playground sections">
-        <button class="nav-item active" data-nav="explore" type="button"><span class="nav-icon">▦</span> Explore <span class="nav-arrow">↗</span></button>
-        <button class="nav-item" data-nav="editor" type="button"><span class="nav-icon">✎</span> Editor <span class="nav-arrow">↗</span></button>
-        <button class="nav-item" data-nav="console" type="button"><span class="nav-icon">⌘</span> API console <span class="nav-arrow">↗</span></button>
-      </nav>
-      <div class="sidebar-bottom">
-        <div class="connection"><span id="healthDot" class="status-dot"></span><span id="healthText">Checking API…</span></div>
-        <p>Run requests, shape content, and see the public result in one place.</p>
-        <span class="version">LOCAL TEST WORKSPACE <span>v1</span></span>
+  <div class="site">
+    <div class="utility-bar">
+      <div class="container utility-inner">
+        <span>Stories, guides and updates</span>
+        <span class="connection"><span id="healthDot" class="status-dot"></span><span id="healthText">Checking site…</span></span>
       </div>
-    </aside>
+    </div>
+    <header class="site-header">
+      <div class="container masthead">
+        <a class="wordmark" href="/playground/" aria-label="The Journal home">The Journal<span class="wordmark-period">.</span></a>
+        <span class="masthead-note">A place for useful stories<br>and fresh perspectives.</span>
+      </div>
+      <div class="nav-wrap">
+        <nav class="container primary-nav" aria-label="Main navigation">
+          <button class="nav-link active" data-nav="explore" type="button">Home</button>
+          <a class="nav-link" href="#latest">Latest articles</a>
+          <a class="nav-link" href="#browse">Topics</a>
+          <span class="nav-spacer"></span>
+          <button class="nav-link nav-tool" data-nav="editor" type="button">Editor</button>
+          <button class="nav-link nav-tool" data-nav="console" type="button">API console</button>
+        </nav>
+      </div>
+    </header>
 
-    <main class="main">
-      <header class="topbar">
-        <div class="breadcrumb">WORKSPACE <span>/</span> <strong id="sectionName">EXPLORE</strong></div>
-        <div class="topbar-right"><span class="topbar-note">Connected to this API origin</span><span class="topbar-avatar">B</span></div>
-      </header>
-
+    <main class="container main-content">
       <section id="explorePanel" class="panel" aria-labelledby="exploreTitle">
-        <div class="hero">
-          <div class="hero-copy">
-            <span class="eyebrow"><span class="eyebrow-line"></span> PUBLIC CONTENT</span>
-            <h1 id="exploreTitle">Your stories,<br><em>all in one place.</em></h1>
-            <p>Browse the published feed exactly as your readers will. Search, filter, and open articles to check the response.</p>
-            <button id="newPostShortcut" class="button button-dark" type="button">Create a post <span>↗</span></button>
+        <div class="section-kicker"><span>THE JOURNAL</span><span id="today"></span></div>
+        <div class="page-heading">
+          <div><p class="overline">READ, EXPLORE, DISCOVER</p><h1 id="exploreTitle">Stories worth your time.</h1></div>
+          <p>Ideas, practical guides and updates from the people behind this publication.</p>
+        </div>
+        <div id="leadPost" class="lead-post" aria-live="polite"></div>
+        <div class="content-layout">
+          <div class="feed-column">
+            <div class="section-heading" id="latest"><div><p class="overline">THE ARCHIVE</p><h2>Latest articles</h2></div><button id="refreshPublic" class="plain-link" type="button">Refresh stories <span aria-hidden="true">↻</span></button></div>
+            <form id="filters" class="filters">
+              <label class="search-wrap"><span class="sr-only">Search articles</span><input id="searchInput" type="search" placeholder="Search articles" autocomplete="off"><span class="search-icon" aria-hidden="true">⌕</span></label>
+              <label class="sr-only" for="categoryFilter">Category</label><select id="categoryFilter"><option value="">All categories</option></select>
+              <label class="sr-only" for="tagFilter">Tag</label><select id="tagFilter"><option value="">All tags</option></select>
+              <label class="featured-filter"><input id="featuredFilter" type="checkbox"> Featured</label>
+            </form>
+            <div id="postGrid" class="post-list" aria-live="polite"></div>
+            <div class="pager"><span id="pageInfo">—</span><div><button id="previousPage" type="button" aria-label="Previous page">Previous</button><button id="nextPage" type="button" aria-label="Next page">Next</button></div></div>
           </div>
-          <div class="hero-art" aria-hidden="true"><span class="art-ring art-ring-one"></span><span class="art-ring art-ring-two"></span><span class="art-paper">WRITE<br><i>something</i><br>worth reading<span class="art-star">✳</span></span></div>
+          <aside class="site-aside" id="browse" aria-label="Explore the journal">
+            <div class="aside-block"><p class="overline">ABOUT THIS SITE</p><h2>Good stories, simply told.</h2><p>Browse the latest writing, look up a topic, or open an article to read it in full.</p></div>
+            <div class="aside-block"><p class="overline">BROWSE BY TOPIC</p><div id="topicList" class="topic-list"><span>Loading topics…</span></div></div>
+            <div class="aside-block aside-count"><strong id="articleCount">—</strong><span>published articles in the archive</span></div>
+          </aside>
         </div>
-
-        <div class="stats">
-          <div class="stat"><span class="stat-icon stat-icon-orange">▦</span><span class="stat-value" id="publishedCount">—</span><span class="stat-label">Published posts</span></div>
-          <div class="stat"><span class="stat-icon stat-icon-green">◈</span><span class="stat-value" id="categoryCount">—</span><span class="stat-label">Categories</span></div>
-          <div class="stat"><span class="stat-icon stat-icon-purple">#</span><span class="stat-value" id="tagCount">—</span><span class="stat-label">Active tags</span></div>
-        </div>
-
-        <div class="section-heading"><div><span class="eyebrow">THE LIVE FEED</span><h2>Published articles</h2></div><button id="refreshPublic" class="text-button" type="button">↻ Refresh feed</button></div>
-        <form id="filters" class="filters">
-          <label class="search-wrap"><span class="sr-only">Search posts</span><span class="search-icon">⌕</span><input id="searchInput" type="search" placeholder="Search stories, ideas, topics…" autocomplete="off"></label>
-          <label class="sr-only" for="categoryFilter">Category</label><select id="categoryFilter"><option value="">All categories</option></select>
-          <label class="sr-only" for="tagFilter">Tag</label><select id="tagFilter"><option value="">All tags</option></select>
-          <label class="featured-filter"><input id="featuredFilter" type="checkbox"><span>Featured only</span></label>
-        </form>
-        <div id="postGrid" class="post-grid" aria-live="polite"></div>
-        <div class="pager"><span id="pageInfo">—</span><div><button id="previousPage" type="button" aria-label="Previous page">←</button><button id="nextPage" type="button" aria-label="Next page">→</button></div></div>
       </section>
 
-      <section id="editorPanel" class="panel" hidden aria-labelledby="editorTitle">
-        <div class="page-intro"><span class="eyebrow">EDITOR WORKSPACE</span><h1 id="editorTitle">Make something <em>good.</em></h1><p>Create drafts, update articles, and publish when they are ready.</p></div>
-        <div class="token-card"><div><strong>Editor access</strong><p id="tokenStatus">Enter the admin token to work with drafts. It stays in this tab only.</p></div><div class="token-controls"><input id="tokenInput" type="password" placeholder="Paste admin token" autocomplete="off" aria-label="Admin token"><button id="connectToken" class="button button-dark" type="button">Connect</button><button id="disconnectToken" class="button button-quiet" type="button" hidden>Disconnect</button></div></div>
+      <section id="editorPanel" class="panel work-panel" hidden aria-labelledby="editorTitle">
+        <div class="work-heading"><p class="overline">FOR EDITORS</p><h1 id="editorTitle">Edit the journal</h1><p>Create drafts, update articles and publish when they are ready.</p></div>
+        <div class="token-card"><div><strong>Editor access</strong><p id="tokenStatus">Enter the admin token to work with drafts. It stays in this tab only.</p></div><div class="token-controls"><input id="tokenInput" type="password" placeholder="Admin token" autocomplete="off" aria-label="Admin token"><button id="connectToken" class="button button-primary" type="button">Connect</button><button id="disconnectToken" class="button button-light" type="button" hidden>Disconnect</button></div></div>
         <div class="editor-layout">
-          <div class="drafts-card"><div class="card-title-row"><div><span class="eyebrow">CONTENT LIBRARY</span><h2>All posts</h2></div><button id="refreshAdmin" class="icon-button" type="button" title="Refresh posts" aria-label="Refresh posts">↻</button></div><label class="sr-only" for="adminStatusFilter">Filter posts by status</label><select id="adminStatusFilter"><option value="">All statuses</option><option value="draft">Drafts</option><option value="published">Published</option></select><div id="adminList" class="admin-list"><div class="list-empty">Connect to load posts.</div></div><button id="newPost" class="button button-outline full" type="button">+ New article</button></div>
-          <form id="editorForm" class="editor-form"><div class="card-title-row"><div><span class="eyebrow" id="editorMode">NEW ARTICLE</span><h2>Article details</h2></div><span id="postStatusBadge" class="post-status">DRAFT</span></div>
-            <div class="form-grid"><label class="wide">Title <input name="title" required minlength="3" maxlength="160" placeholder="A title readers will remember"></label><label class="wide">Summary <textarea name="summary" required minlength="10" maxlength="300" rows="2" placeholder="A short reason to keep reading"></textarea></label><label>Category <input name="category" required minlength="2" maxlength="50" placeholder="e.g. Guides"></label><label>Author <input name="author" maxlength="100" placeholder="e.g. Editorial Team"></label><label class="wide">Tags <input name="tags" placeholder="Comma separated: writing, ideas, news"><small>Up to 10 tags. Separate each with a comma.</small></label><label class="wide">Cover image URL <input name="cover_image" type="url" placeholder="https://example.com/cover.jpg"></label><label class="wide">Body <textarea name="body" required minlength="20" rows="12" placeholder="Write the full article here…"></textarea></label></div>
-            <label class="feature-toggle"><input name="featured" type="checkbox"><span class="toggle-track"></span><span><strong>Feature this article</strong><small>Show it in featured results</small></span></label>
-            <div class="editor-actions"><button id="saveDraft" class="button button-outline" type="button">Save as draft</button><button id="publishPost" class="button button-dark" type="button">Publish article <span>↗</span></button><button id="deletePost" class="button button-danger" type="button" hidden>Delete</button></div>
+          <div class="drafts-card"><div class="card-title-row"><div><p class="overline">CONTENT LIBRARY</p><h2>All posts</h2></div><button id="refreshAdmin" class="icon-button" type="button" title="Refresh posts" aria-label="Refresh posts">↻</button></div><label class="sr-only" for="adminStatusFilter">Filter posts by status</label><select id="adminStatusFilter"><option value="">All statuses</option><option value="draft">Drafts</option><option value="published">Published</option></select><div id="adminList" class="admin-list"><div class="list-empty">Connect to load posts.</div></div><button id="newPost" class="button button-light full" type="button">+ New article</button></div>
+          <form id="editorForm" class="editor-form"><div class="card-title-row"><div><p class="overline" id="editorMode">NEW ARTICLE</p><h2>Article details</h2></div><span id="postStatusBadge" class="post-status">DRAFT</span></div>
+            <div class="form-grid"><label class="wide">Title <input name="title" required minlength="3" maxlength="160" placeholder="Article title"></label><label class="wide">Summary <textarea name="summary" required minlength="10" maxlength="300" rows="2" placeholder="A short introduction"></textarea></label><label>Category <input name="category" required minlength="2" maxlength="50" placeholder="e.g. Guides"></label><label>Author <input name="author" maxlength="100" placeholder="Author name"></label><label class="wide">Tags <input name="tags" placeholder="Comma separated"><small>Up to 10 tags, separated by commas.</small></label><label class="wide">Cover image URL <input name="cover_image" type="url" placeholder="https://example.com/cover.jpg"></label><label class="wide">Body <textarea name="body" required minlength="20" rows="12" placeholder="Write the full article here…"></textarea></label></div>
+            <label class="feature-toggle"><input name="featured" type="checkbox"><span><strong>Featured article</strong><small>Mark this article as featured.</small></span></label>
+            <div class="editor-actions"><button id="saveDraft" class="button button-light" type="button">Save as draft</button><button id="publishPost" class="button button-primary" type="button">Publish article</button><button id="deletePost" class="button button-danger" type="button" hidden>Delete</button></div>
           </form>
         </div>
       </section>
 
-      <section id="consolePanel" class="panel" hidden aria-labelledby="consoleTitle">
-        <div class="page-intro"><span class="eyebrow">FOR THE CURIOUS</span><h1 id="consoleTitle">Under the <em>hood.</em></h1><p>Send a request to any route on this API and inspect the result. Admin requests use the token from the Editor tab.</p></div>
-        <div class="console-layout"><form id="requestForm" class="console-card"><div class="card-title-row"><div><span class="eyebrow">REQUEST BUILDER</span><h2>Try an endpoint</h2></div><span class="terminal-mark">&gt;_</span></div><div class="request-line"><label class="sr-only" for="requestMethod">Method</label><select id="requestMethod"><option>GET</option><option>POST</option><option>PATCH</option><option>DELETE</option></select><label class="sr-only" for="requestPath">Path</label><input id="requestPath" value="/posts" placeholder="/posts"></div><label class="auth-check"><input id="requestAuth" type="checkbox"> Include editor token</label><label class="body-label" for="requestBody">JSON BODY <span>POST / PATCH</span></label><textarea id="requestBody" rows="9" spellcheck="false" placeholder='{"title":"My first post"}'></textarea><button class="button button-dark full" type="submit">Send request <span>↗</span></button></form>
-          <div class="response-stack"><div class="console-card response-card"><div class="card-title-row"><div><span class="eyebrow">RESPONSE</span><h2>What came back</h2></div><span id="responseStatus" class="response-status">READY</span></div><div class="response-meta"><span id="responseTime">— ms</span><span id="responseCache">Cache: —</span></div><pre id="responseBody">Send a request to see the response.</pre></div><div class="console-card log-card"><div class="card-title-row"><div><span class="eyebrow">RECENT ACTIVITY</span><h2>Request log</h2></div><span id="requestCount" class="request-count">0 calls</span></div><div id="requestLog" class="request-log"><p class="list-empty">No requests yet.</p></div></div></div>
+      <section id="consolePanel" class="panel work-panel" hidden aria-labelledby="consoleTitle">
+        <div class="work-heading"><p class="overline">DEVELOPER TOOLS</p><h1 id="consoleTitle">API console</h1><p>Send a request to this API and inspect the response. Admin requests use the token from the Editor tab.</p></div>
+        <div class="console-layout"><form id="requestForm" class="console-card"><div class="card-title-row"><div><p class="overline">REQUEST BUILDER</p><h2>Try an endpoint</h2></div></div><div class="request-line"><label class="sr-only" for="requestMethod">Method</label><select id="requestMethod"><option>GET</option><option>POST</option><option>PATCH</option><option>DELETE</option></select><label class="sr-only" for="requestPath">Path</label><input id="requestPath" value="/posts" placeholder="/posts"></div><label class="auth-check"><input id="requestAuth" type="checkbox"> Include editor token</label><label class="body-label" for="requestBody">JSON body <span>POST / PATCH</span></label><textarea id="requestBody" rows="9" spellcheck="false" placeholder='{"title":"My first post"}'></textarea><button class="button button-primary full" type="submit">Send request</button></form>
+          <div class="response-stack"><div class="console-card response-card"><div class="card-title-row"><div><p class="overline">RESPONSE</p><h2>What came back</h2></div><span id="responseStatus" class="response-status">READY</span></div><div class="response-meta"><span id="responseTime">— ms</span><span id="responseCache">Cache: —</span></div><pre id="responseBody">Send a request to see the response.</pre></div><div class="console-card log-card"><div class="card-title-row"><div><p class="overline">RECENT ACTIVITY</p><h2>Request log</h2></div><span id="requestCount" class="request-count">0 calls</span></div><div id="requestLog" class="request-log"><p class="list-empty">No requests yet.</p></div></div></div>
         </div>
       </section>
     </main>
+    <footer class="site-footer"><div class="container footer-inner"><a class="footer-brand" href="/playground/">The Journal<span>.</span></a><span>Stories, guides and updates.</span><button type="button" data-nav="editor">Editor access</button></div></footer>
   </div>
-
   <dialog id="articleDialog" class="article-dialog"><button id="closeArticle" class="dialog-close" type="button" aria-label="Close article">×</button><div id="articleContent"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
