@@ -282,7 +282,7 @@ function renderPosts(posts) {
     read.href = articleURL(post.slug);
     read.className = 'read-link';
     read.textContent = 'Read the story →';
-    copy.append(title, summary, meta, read);
+    copy.append(meta, title, summary, read);
     lead.append(copy);
     if (post.cover_image) {
       const media = document.createElement('div');
@@ -336,7 +336,13 @@ function renderPosts(posts) {
     const more = document.createElement('span');
     more.className = 'read-link';
     more.textContent = 'Read article →';
-    copy.append(meta, title, summary, more);
+    const heading = document.createElement('div');
+    heading.className = 'preview-heading';
+    const rule = document.createElement('span');
+    rule.className = 'preview-rule';
+    rule.setAttribute('aria-hidden', 'true');
+    heading.append(title, rule);
+    copy.append(meta, heading, summary, more);
     row.append(copy);
     if (post.cover_image) {
       const image = document.createElement('img');
@@ -384,7 +390,7 @@ async function loadArticlePage(slug) {
     const { data } = await api('GET', `/posts/${encodeURIComponent(slug)}`);
     const post = withEditorialCover(data);
     root.replaceChildren();
-    document.title = `${post.title} — The Journal`;
+    document.title = `${post.title} — Offscript`;
     const header = document.createElement('header');
     header.className = 'article-header';
     const category = document.createElement('span');
@@ -428,7 +434,7 @@ async function loadArticlePage(slug) {
     }
     await loadRelated(slug);
   } catch (error) {
-    document.title = 'Article unavailable — The Journal';
+    document.title = 'Article unavailable — Offscript';
     root.replaceChildren();
     const heading = document.createElement('h1');
     heading.textContent = 'This article is unavailable.';

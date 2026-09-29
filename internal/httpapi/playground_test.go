@@ -23,7 +23,7 @@ func TestPlaygroundIsOptInAndServesAssets(t *testing.T) {
 	}
 	handler := httpapi.New(nil, nil, "test-secret-with-at-least-32-characters", "", true, logger)
 	page := request(handler, "/")
-	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "The Journal") || !strings.Contains(page.Body.String(), "id=\"leadPost\"") || page.Header().Get("Content-Security-Policy") == "" {
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "Offscript") || !strings.Contains(page.Body.String(), "id=\"leadPost\"") || page.Header().Get("Content-Security-Policy") == "" {
 		t.Fatalf("playground page: %d %s", page.Code, page.Body.String())
 	}
 	for _, asset := range []string{"/playground/app.js", "/playground/styles.css"} {
@@ -48,7 +48,7 @@ func TestArticlePageRequiresPublishedPost(t *testing.T) {
 	published := create(t, handler, "A published article", "published", "Guides")
 	draft := create(t, handler, "A draft article", "draft", "Guides")
 	page := request(t, handler, "GET", "/stories/"+published.Slug, false, nil)
-	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "<title>A published article — The Journal</title>") {
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "<title>A published article — Offscript</title>") {
 		t.Fatalf("published article page: %d %s", page.Code, page.Body.String())
 	}
 	for _, slug := range []string{draft.Slug, "missing-article"} {

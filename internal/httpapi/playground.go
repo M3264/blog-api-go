@@ -44,8 +44,8 @@ func mountPlayground(mux *http.ServeMux, db *storage.DB) {
 			}
 			title := html.EscapeString(post.Title)
 			description := html.EscapeString(post.Summary)
-			meta := "<title>" + title + " — The Journal</title>\n  <meta name=\"description\" content=\"" + description + "\">\n  <meta property=\"og:title\" content=\"" + title + "\">\n  <meta property=\"og:description\" content=\"" + description + "\">"
-			articlePage := strings.Replace(string(page), "<title>The Journal — Stories and updates</title>", meta, 1)
+			meta := "<title>" + title + " — Offscript</title>\n  <meta name=\"description\" content=\"" + description + "\">\n  <meta property=\"og:title\" content=\"" + title + "\">\n  <meta property=\"og:description\" content=\"" + description + "\">"
+			articlePage := strings.Replace(string(page), "<title>Offscript — Stories and updates</title>", meta, 1)
 			playgroundHeaders(w)
 			http.ServeContent(w, r, "index.html", time.Time{}, strings.NewReader(articlePage))
 			return

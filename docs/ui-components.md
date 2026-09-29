@@ -1,4 +1,4 @@
-# UI component provenance
+# Offscript UI component provenance
 
 Installed as a framework-native adaptation (HTML and CSS), preserving the existing Go embed pipeline.
 
@@ -6,7 +6,7 @@ Installed as a framework-native adaptation (HTML and CSS), preserving the existi
 - Retrieved through the 21st.dev MCP on 2026-09-29. Implemented in `internal/httpapi/web/index.html` (`editorial-hero`) and `styles.css`.
 - Adapted the component's left tagline / right headline, description and CTA grid, responsive single-column behavior, balanced serif heading and optional media structure. React, Motion and Balancer were replaced with semantic HTML and native CSS. No demo imagery or studio copy is used.
 
-## Story-led refinement
+## Offscript redesign
 The split promotional hero was removed after visual feedback. The homepage now leads with actual articles, using a large image-led story and two supporting articles. Newsreader and DM Sans are self-hosted under their SIL Open Font Licenses (included in this directory).
 
 Illustrative photographs, downloaded from Unsplash and served locally, apply only to three seeded sample articles when no cover is supplied:

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#faf9f6">
-  <title>The Journal — Stories and updates</title>
-  <link rel="preload" href="/playground/newsreader-400.ttf" as="font" type="font/ttf" crossorigin>
+  <title>Offscript — Stories and updates</title>
+  <link rel="preload" href="/playground/dm-sans-600.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="/playground/styles.css">
   <script type="module" src="/playground/app.js"></script>
 </head>
@@ -21,8 +21,8 @@
     </div>
     <header class="site-header">
       <div class="container masthead">
-        <a class="wordmark" href="/" aria-label="The Journal home">The Journal<span class="wordmark-period">.</span></a>
-        <span class="masthead-note">Independent thinking.<br>Everyday perspective.</span>
+        <a class="wordmark" href="/" aria-label="Offscript home">offscript<span class="wordmark-period">*</span></a>
+        <span class="masthead-note">For the curious.</span>
       </div>
       <div class="nav-wrap">
         <nav class="container primary-nav" aria-label="Main navigation">
@@ -38,15 +38,15 @@
 
     <main id="mainContent" tabindex="-1" class="container main-content">
       <section id="explorePanel" class="panel" aria-labelledby="exploreTitle">
-        <div class="section-kicker"><span>Ideas for everyday life</span><span id="today"></span></div>
-        <h1 id="exploreTitle" class="sr-only">The Journal — Latest stories</h1>
+        <div class="section-kicker"><span>Life, with a fresh perspective.</span><span id="today"></span></div>
+        <h1 id="exploreTitle" class="sr-only">Offscript — Latest stories</h1>
         <div class="front-page">
           <div id="leadPost" class="lead-post" aria-live="polite"></div>
           <div id="topStories" class="top-stories" aria-label="More stories"></div>
         </div>
         <div class="content-layout">
           <div class="feed-column">
-            <div class="section-heading" id="latest"><div><h2>The latest</h2></div><button id="refreshPublic" class="plain-link" type="button">Refresh stories <span aria-hidden="true">↻</span></button></div>
+            <div class="section-heading" id="latest"><div><h2>Worth a read<span class="heading-dot">.</span></h2></div><button id="refreshPublic" class="plain-link" type="button">Refresh stories <span aria-hidden="true">↻</span></button></div>
             <form id="filters" class="filters">
               <label class="search-wrap"><span class="sr-only">Search articles</span><input id="searchInput" type="search" placeholder="Search stories…" autocomplete="off" name="searchInput"><svg class="search-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg></label>
               <label class="sr-only" for="categoryFilter">Category</label><select id="categoryFilter" name="categoryFilter"><option value="">All categories</option></select>
@@ -56,8 +56,8 @@
             <div id="postGrid" class="post-list" aria-live="polite"></div>
             <div class="pager"><span id="pageInfo">—</span><div><button id="previousPage" type="button" aria-label="Previous page">Previous</button><button id="nextPage" type="button" aria-label="Next page">Next</button></div></div>
           </div>
-          <aside class="site-aside" id="browse" aria-label="Explore the journal">
-            <div class="aside-block"><h2>Explore the journal</h2><p>Follow a curiosity. Browse the topics below to find a story that speaks to you.</p></div>
+          <aside class="site-aside" id="browse" aria-label="Find your next read">
+            <div class="aside-block"><h2>Find your next read</h2><p>Follow a curiosity. Browse the topics below to find a story that speaks to you.</p></div>
             <div class="aside-block"><div id="topicList" class="topic-list"><span>Loading topics…</span></div></div>
             <div class="aside-block aside-count"><strong id="articleCount">—</strong><span>published articles in the archive</span></div>
           </aside>
@@ -74,7 +74,7 @@
       </section>
 
       <section id="editorPanel" class="panel work-panel" hidden aria-labelledby="editorTitle">
-        <div class="work-heading"><h1 id="editorTitle">Edit the journal</h1><p>Create drafts, update articles and publish when they are ready.</p></div>
+        <div class="work-heading"><h1 id="editorTitle">Edit Offscript</h1><p>Create drafts, update articles and publish when they are ready.</p></div>
         <div class="token-card"><div><strong>Editor access</strong><p id="tokenStatus">Enter the admin token to work with drafts. It stays in this tab only.</p></div><div class="token-controls"><input id="tokenInput" type="password" placeholder="Admin token…" autocomplete="off" aria-label="Admin token" name="tokenInput" spellcheck="false"><button id="connectToken" class="button button-primary" type="button">Connect</button><button id="disconnectToken" class="button button-light" type="button" hidden>Disconnect</button></div></div>
         <div class="editor-layout">
           <div class="drafts-card"><div class="card-title-row"><div><h2>All posts</h2></div><button id="refreshAdmin" class="icon-button" type="button" title="Refresh posts" aria-label="Refresh posts">↻</button></div><label class="sr-only" for="adminStatusFilter">Filter posts by status</label><select id="adminStatusFilter" name="adminStatusFilter"><option value="">All statuses</option><option value="draft">Drafts</option><option value="published">Published</option></select><div id="adminList" class="admin-list"><div class="list-empty">Connect to load posts.</div></div><button id="newPost" class="button button-light full" type="button">+ New article</button></div>
@@ -93,7 +93,7 @@
         </div>
       </section>
     </main>
-    <footer class="site-footer"><div class="container footer-inner"><a class="footer-brand" href="/">The Journal<span>.</span></a><span>Stories, guides and updates.</span><a class="footer-editor" href="/#editor" data-nav="editor">Editor access</a></div></footer>
+    <footer class="site-footer"><div class="container footer-inner"><a class="footer-brand" href="/">offscript<span>*</span></a><span>A little outside the ordinary.</span><a class="footer-editor" href="/#editor" data-nav="editor">Editor access</a></div></footer>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
