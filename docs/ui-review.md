@@ -23,3 +23,6 @@ Chromium, 1440px and 390px: homepage and full article screenshots inspected. No 
 Impeccable's mechanical detector could not resolve Go's /playground/styles.css mapping and reported a flat type hierarchy from unstyled HTML. Actual computed homepage h1 sizes were 62px desktop and 40px mobile, with 15px base text; the visual review confirms the hierarchy.
 
 This is a focused UI review, not an accessibility certification or security penetration test.
+
+## Follow-up visual correction
+Removed the promotional hero and color-block lead. Added a story-led front page, locally hosted Newsreader/DM Sans and three illustrative sample-story photographs. Rechecked desktop/mobile screenshots, full article routes, search reload, dirty-editor cancellation and JavaScript errors. Both 1440px and 390px render without horizontal overflow; all checks passed. Article and editor behavior is preserved.

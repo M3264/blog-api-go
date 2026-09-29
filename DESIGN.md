@@ -1,6 +1,6 @@
 # The Journal
-An established editorial publication: warm paper, burgundy ink, Georgia headlines, fine rules and generous reading space. Native controls and typography carry the interface.
+Warm paper, restrained burgundy accents, Newsreader headlines, DM Sans navigation and fine editorial rules. Body text on article pages remains Georgia for comfortable long reading.
 
-This rebuild uses a split editorial introduction adapted from 21st.dev Editorial Hero by felipemenezes098, with a lead story beneath. The archive has two columns of typographic stories on wide screens and a single stream on mobile. Topic navigation sits in a narrow rail. Article pages have a left-aligned headline, restrained metadata and a readable text measure. Editor and API tools remain secondary navigation destinations.
+The homepage leads with real stories: one large image-led article and two smaller supporting articles, followed by a quiet archive and topic rail. A centered masthead gives the publication a distinct identity. There is no promotional welcome hero or solid-color feature card. Photography is illustrative and specific to the seeded sample articles; user-supplied covers take priority.
 
-Acceptance: distinct reader hierarchy, permanent article links, no placeholder imagery, keyboard navigation, reduced motion, mobile readability and unchanged content/API behavior.
+Mobile reading order: masthead, navigation, lead story, two supporting stories, archive and topics. Permanent article URLs, safe text rendering, visible keyboard focus, reduced motion and all editor/API functionality remain required.

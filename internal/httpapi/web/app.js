@@ -204,6 +204,7 @@ async function loadPosts() {
   const grid = $('#postGrid');
   grid.replaceChildren();
   $('#leadPost').replaceChildren();
+  $('#topStories').replaceChildren();
   const loading = document.createElement('div');
   loading.className = 'empty-state';
   loading.textContent = 'Loading articles…';
@@ -235,7 +236,19 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? 'Recently' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+const editorialCovers = {
+  'start-the-semester-with-a-simple-weekly-plan': 'writing.jpg',
+  'keep-files-links-and-deadlines-in-one-place': 'workspace.jpg',
+  'find-your-people-without-joining-everything': 'library.jpg',
+};
+function withEditorialCover(post) {
+  return { ...post, cover_image: post.cover_image || (editorialCovers[post.slug] ? `/playground/${editorialCovers[post.slug]}` : '') };
+}
 function renderPosts(posts) {
+  posts = posts.map(withEditorialCover);
+  const top = $('#topStories');
+  top.replaceChildren();
+  $('#leadPost').parentElement.hidden = state.page !== 0 || !posts.length;
   const grid = $('#postGrid');
   const lead = $('#leadPost');
   grid.replaceChildren();
@@ -257,9 +270,6 @@ function renderPosts(posts) {
     else lead.classList.remove('has-image');
     const copy = document.createElement('div');
     copy.className = 'lead-copy';
-    const label = document.createElement('span');
-    label.className = 'lead-label';
-    label.textContent = post.featured ? 'Featured story' : 'Latest story';
     const title = document.createElement('h2');
     const titleLink = document.createElement('a');
     titleLink.href = articleURL(post.slug);
@@ -272,7 +282,7 @@ function renderPosts(posts) {
     read.href = articleURL(post.slug);
     read.className = 'read-link';
     read.textContent = 'Read the story →';
-    copy.append(label, title, summary, meta, read);
+    copy.append(title, summary, meta, read);
     lead.append(copy);
     if (post.cover_image) {
       const media = document.createElement('div');
@@ -289,7 +299,23 @@ function renderPosts(posts) {
       lead.append(media);
     }
   }
-  const remaining = state.page === 0 ? posts.slice(1) : posts;
+  if (state.page === 0) posts.slice(1, 3).forEach((post) => {
+    const link = document.createElement('a');
+    link.href = articleURL(post.slug);
+    link.className = 'top-story';
+    if (post.cover_image) {
+      const image = document.createElement('img');
+      image.src = post.cover_image; image.alt = ''; image.width = 640; image.height = 360;
+      image.decoding = 'async'; image.addEventListener('error', () => image.remove());
+      link.append(image);
+    }
+    const title = document.createElement('h2'); title.textContent = post.title;
+    link.append(storyMeta(post), title);
+    top.append(link);
+  });
+  top.hidden = !top.childElementCount;
+  $('#leadPost').parentElement.classList.toggle('single-story', top.hidden);
+  const remaining = state.page === 0 ? posts.slice(3) : posts;
   if (!remaining.length) {
     const note = document.createElement('p');
     note.className = 'empty-state';
@@ -355,7 +381,8 @@ async function loadArticlePage(slug) {
   const root = $('#articleContent');
   root.textContent = 'Loading article…';
   try {
-    const { data: post } = await api('GET', `/posts/${encodeURIComponent(slug)}`);
+    const { data } = await api('GET', `/posts/${encodeURIComponent(slug)}`);
+    const post = withEditorialCover(data);
     root.replaceChildren();
     document.title = `${post.title} — The Journal`;
     const header = document.createElement('header');
