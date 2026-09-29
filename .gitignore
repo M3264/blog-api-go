@@ -1,0 +1,6 @@
+data/
+blog-api-go
+.env
+*.db
+*.db-shm
+*.db-wal

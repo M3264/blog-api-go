@@ -1,0 +1,27 @@
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    environment:
+      BLOG_ADMIN_TOKEN: ${BLOG_ADMIN_TOKEN:?set BLOG_ADMIN_TOKEN}
+      BLOG_ALLOWED_ORIGIN: ${BLOG_ALLOWED_ORIGIN:-}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - blog-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  blog-data:

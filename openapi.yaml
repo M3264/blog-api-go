@@ -1,0 +1,270 @@
+openapi: 3.0.3
+info:
+  title: Blog API
+  version: 1.0.0
+  description: API for publishing articles. Public routes show published posts only.
+servers:
+  - url: http://127.0.0.1:8080
+paths:
+  /health:
+    get:
+      summary: Process health
+      responses:
+        '200':
+          description: Running
+  /ready:
+    get:
+      summary: Database readiness
+      responses:
+        '200':
+          description: Ready
+        '500':
+          $ref: '#/components/responses/Error'
+  /posts:
+    get:
+      summary: List published posts
+      parameters:
+        - $ref: '#/components/parameters/Query'
+        - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Tag'
+        - $ref: '#/components/parameters/Featured'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/PostPage'
+        '400':
+          $ref: '#/components/responses/Error'
+  /posts/{slug}:
+    get:
+      summary: Read a published post
+      parameters:
+        - $ref: '#/components/parameters/Slug'
+      responses:
+        '200':
+          $ref: '#/components/responses/Post'
+        '404':
+          $ref: '#/components/responses/Error'
+  /posts/{slug}/related:
+    get:
+      summary: Find posts sharing category or tags
+      parameters:
+        - $ref: '#/components/parameters/Slug'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/PostPage'
+        '404':
+          $ref: '#/components/responses/Error'
+  /categories:
+    get:
+      summary: Published post counts by category
+      responses:
+        '200':
+          description: Category counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TermCount'
+  /tags:
+    get:
+      summary: Published post counts by tag
+      responses:
+        '200':
+          description: Tag counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tags:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TermCount'
+  /admin/posts:
+    get:
+      summary: List all posts
+      security: [{adminToken: []}]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published]
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/PostPage'
+        '401':
+          $ref: '#/components/responses/Error'
+    post:
+      summary: Create a post
+      security: [{adminToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostInput'
+      responses:
+        '201':
+          $ref: '#/components/responses/Post'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+  /admin/posts/{slug}:
+    parameters:
+      - $ref: '#/components/parameters/Slug'
+    get:
+      summary: Read any post, including drafts
+      security: [{adminToken: []}]
+      responses:
+        '200':
+          $ref: '#/components/responses/Post'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      summary: Update or publish a post
+      security: [{adminToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostPatch'
+      responses:
+        '200':
+          $ref: '#/components/responses/Post'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      summary: Delete a post
+      security: [{adminToken: []}]
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    adminToken:
+      type: http
+      scheme: bearer
+  parameters:
+    Slug:
+      name: slug
+      in: path
+      required: true
+      schema: {type: string}
+    Query:
+      name: q
+      in: query
+      schema: {type: string, maxLength: 200}
+    Category:
+      name: category
+      in: query
+      schema: {type: string, maxLength: 50}
+    Tag:
+      name: tag
+      in: query
+      schema: {type: string, maxLength: 30}
+    Featured:
+      name: featured
+      in: query
+      schema: {type: boolean}
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 50, default: 10}
+    Offset:
+      name: offset
+      in: query
+      schema: {type: integer, minimum: 0, default: 0}
+  schemas:
+    PostFields:
+      type: object
+      properties:
+        title: {type: string, minLength: 3, maxLength: 160}
+        summary: {type: string, minLength: 10, maxLength: 300}
+        body: {type: string, minLength: 20, maxLength: 100000}
+        category: {type: string, minLength: 2, maxLength: 50}
+        author: {type: string, maxLength: 100}
+        cover_image: {type: string, format: uri}
+        tags:
+          type: array
+          maxItems: 10
+          uniqueItems: true
+          items: {type: string, minLength: 2, maxLength: 30}
+        featured: {type: boolean, default: false}
+        status: {type: string, enum: [draft, published], default: draft}
+    PostInput:
+      allOf:
+        - $ref: '#/components/schemas/PostFields'
+        - type: object
+          required: [title, summary, body, category]
+    PostPatch:
+      allOf:
+        - $ref: '#/components/schemas/PostFields'
+        - type: object
+          minProperties: 1
+    Post:
+      allOf:
+        - $ref: '#/components/schemas/PostFields'
+        - type: object
+          required: [slug, title, summary, body, category, status, created_at, updated_at]
+          properties:
+            slug: {type: string}
+            created_at: {type: string, format: date-time}
+            updated_at: {type: string, format: date-time}
+            published_at: {type: string, format: date-time}
+    PostPage:
+      type: object
+      required: [posts, total, limit, offset]
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+        total: {type: integer}
+        limit: {type: integer}
+        offset: {type: integer}
+    TermCount:
+      type: object
+      required: [name, count]
+      properties:
+        name: {type: string}
+        count: {type: integer}
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: {type: string}
+  responses:
+    Post:
+      description: Post
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Post'
+    PostPage:
+      description: Paginated posts
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostPage'
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
