@@ -14,26 +14,28 @@ import (
 	"time"
 
 	"github.com/M3264/blog-api-go/internal/blog"
+	"github.com/M3264/blog-api-go/internal/cache"
 	"github.com/M3264/blog-api-go/internal/storage"
 )
 
 type API struct {
 	db     *storage.DB
+	cache  *cache.Cache
 	token  string
 	origin string
 	log    *slog.Logger
 }
 
-func New(db *storage.DB, token, origin string, logger *slog.Logger) http.Handler {
-	a := &API{db: db, token: token, origin: origin, log: logger}
+func New(db *storage.DB, cacheClient *cache.Cache, token, origin string, logger *slog.Logger) http.Handler {
+	a := &API{db: db, cache: cacheClient, token: token, origin: origin, log: logger}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("GET /ready", a.ready)
-	mux.HandleFunc("GET /posts", a.listPublic)
-	mux.HandleFunc("GET /posts/{slug}", a.getPublic)
-	mux.HandleFunc("GET /posts/{slug}/related", a.related)
-	mux.HandleFunc("GET /categories", a.categories)
-	mux.HandleFunc("GET /tags", a.tags)
+	mux.HandleFunc("GET /posts", cacheClient.Public(a.listPublic))
+	mux.HandleFunc("GET /posts/{slug}", cacheClient.Public(a.getPublic))
+	mux.HandleFunc("GET /posts/{slug}/related", cacheClient.Public(a.related))
+	mux.HandleFunc("GET /categories", cacheClient.Public(a.categories))
+	mux.HandleFunc("GET /tags", cacheClient.Public(a.tags))
 	mux.HandleFunc("GET /admin/posts", a.authorize(a.listAdmin))
 	mux.HandleFunc("GET /admin/posts/{slug}", a.authorize(a.getAdmin))
 	mux.HandleFunc("POST /admin/posts", a.authorize(a.create))
@@ -159,6 +161,7 @@ func (a *API) create(w http.ResponseWriter, r *http.Request) {
 		a.internal(w, err)
 		return
 	}
+	a.cache.Invalidate()
 	w.Header().Set("Location", "/admin/posts/"+p.Slug)
 	writeJSON(w, 201, p)
 }
@@ -184,6 +187,7 @@ func (a *API) update(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	a.cache.Invalidate()
 	writeJSON(w, 200, p)
 }
 
@@ -192,6 +196,7 @@ func (a *API) delete(w http.ResponseWriter, r *http.Request) {
 		a.postError(w, err)
 		return
 	}
+	a.cache.Invalidate()
 	w.WriteHeader(204)
 }
 

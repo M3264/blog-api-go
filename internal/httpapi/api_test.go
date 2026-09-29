@@ -8,22 +8,25 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/M3264/blog-api-go/internal/blog"
+	"github.com/M3264/blog-api-go/internal/cache"
 	"github.com/M3264/blog-api-go/internal/httpapi"
 	"github.com/M3264/blog-api-go/internal/storage"
+	"github.com/M3264/blog-api-go/internal/testdb"
 )
 
 func setup(t *testing.T) (http.Handler, *storage.DB) {
 	t.Helper()
-	db, err := storage.Open(context.Background(), filepath.Join(t.TempDir(), "blog.db"))
+	db, err := storage.Open(context.Background(), testdb.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	return httpapi.New(db, "test-secret-with-at-least-32-characters", "https://blog.example", slog.New(slog.NewTextHandler(io.Discard, nil))), db
+	return httpapi.New(db, nil, "test-secret-with-at-least-32-characters", "https://blog.example", slog.New(slog.NewTextHandler(io.Discard, nil))), db
 }
 
 func request(t *testing.T, h http.Handler, method, path string, auth bool, body any) *httptest.ResponseRecorder {
@@ -155,5 +158,40 @@ func TestValidationSearchAndCORS(t *testing.T) {
 	h.ServeHTTP(w, r)
 	if w.Code != 204 || w.Header().Get("Access-Control-Allow-Origin") != "https://blog.example" {
 		t.Fatalf("CORS: %d %v", w.Code, w.Header())
+	}
+}
+
+func TestRedisCacheInvalidatesAfterPublish(t *testing.T) {
+	redisURL := os.Getenv("TEST_REDIS_URL")
+	if redisURL == "" {
+		t.Skip("TEST_REDIS_URL is not set")
+	}
+	db, err := storage.Open(context.Background(), testdb.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	client, err := cache.Open(redisURL, "test-blog-"+time.Now().Format("20060102150405.000000000"), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	h := httpapi.New(db, client, "test-secret-with-at-least-32-characters", "", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	create(t, h, "First published article", "published", "Guides", "Writing")
+	first := request(t, h, "GET", "/posts", false, nil)
+	if first.Code != 200 {
+		t.Fatalf("first read: %d %s", first.Code, first.Body.String())
+	}
+	second := request(t, h, "GET", "/posts", false, nil)
+	if second.Header().Get("X-Cache") != "HIT" {
+		t.Fatalf("expected cache hit: %v", second.Header())
+	}
+	created := create(t, h, "Second draft article", "draft", "Guides", "Writing")
+	if got := request(t, h, "PATCH", "/admin/posts/"+created.Slug, true, map[string]string{"status": "published"}).Code; got != 200 {
+		t.Fatalf("publish: %d", got)
+	}
+	third := request(t, h, "GET", "/posts", false, nil)
+	if third.Header().Get("X-Cache") == "HIT" || !bytes.Contains(third.Body.Bytes(), []byte(created.Slug)) {
+		t.Fatalf("stale cache: %v %s", third.Header(), third.Body.String())
 	}
 }

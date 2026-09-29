@@ -10,48 +10,53 @@ A Go backend for publishing articles. Editors create drafts, publish articles, a
 | `cmd/migrate-json` | One-time, repeatable import from the earlier JSON store |
 | `internal/blog` | Post model and validation |
 | `internal/httpapi` | HTTP routes, authentication, middleware |
-| `internal/storage` | SQLite repository and embedded schema migrations |
+| `internal/storage` | PostgreSQL repository and embedded schema migrations |
+| `internal/cache` | Redis cache for published reads |
 | `openapi.yaml` | Machine readable API contract |
-| `Dockerfile`, `compose.yaml` | Single-server container deployment |
+| `Dockerfile`, `compose.yaml` | API, PostgreSQL, and Redis deployment |
 | `.github/workflows/ci.yml` | Format, test, vet, and build gates |
 
-SQLite runs in WAL mode with a busy timeout. This deployment is for **one API instance** with a persistent local volume. Use a reverse proxy for HTTPS, keep the database volume backed up, and do not run multiple replicas against separate copies of the file.
+PostgreSQL is the source of truth. Redis caches successful public reads for 30 seconds; writes increment a shared cache version so all API instances stop using old entries. If Redis is unavailable, reads fall through to PostgreSQL. Use a reverse proxy for HTTPS and back up the PostgreSQL volume.
 
 ## Run locally
 
-Requires Go 1.22 or newer and a C compiler for the SQLite driver.
+Requires Go 1.25 or newer and a PostgreSQL database. Redis is optional for local development.
 
 ```bash
 export BLOG_ADMIN_TOKEN="$(openssl rand -hex 32)"
+export BLOG_DATABASE_URL='postgres://blog:password@127.0.0.1:5432/blog?sslmode=disable'
+export BLOG_REDIS_URL='redis://127.0.0.1:6379/0'
 go run ./cmd/api
 ```
 
-The API listens at `http://127.0.0.1:8080` and stores data in `data/blog.db`. To build a binary:
+The API listens at `http://127.0.0.1:8080`. To build a binary:
 
 ```bash
 go build -o blog-api-go ./cmd/api
-BLOG_ADMIN_TOKEN='your-secret-of-at-least-32-characters' ./blog-api-go
+./blog-api-go
 ```
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `BLOG_ADMIN_TOKEN` | required | At least 32 characters; bearer token for editor routes |
 | `BLOG_ADDR` | `127.0.0.1:8080` | Listening address |
-| `BLOG_DB_PATH` | `data/blog.db` | SQLite database path |
+| `BLOG_DATABASE_URL` | required | PostgreSQL connection URL |
+| `BLOG_REDIS_URL` | empty | Redis connection URL; empty disables cache |
+| `BLOG_CACHE_PREFIX` | `blog-api` | Redis key namespace |
 | `BLOG_ALLOWED_ORIGIN` | empty | Exact browser origin allowed by CORS, such as `https://blog.example.com` |
 
 The token is read at startup. Change it and restart the server to rotate it. Protect admin requests with HTTPS when the API is reachable outside localhost.
 
 ## Run with Docker Compose
 
-Create `.env` from `.env.example`, set `BLOG_ADMIN_TOKEN` to a newly generated value, then run:
+Create `.env` from `.env.example`, set `BLOG_ADMIN_TOKEN` and `BLOG_DB_PASSWORD` to newly generated values, then run:
 
 ```bash
 docker compose up --build -d
 docker compose ps
 ```
 
-Compose binds the API to `127.0.0.1:8080` on the host and stores the database in the `blog-data` volume. Put your HTTPS reverse proxy in front of that port. The container runs as a nonroot user, has a read-only root filesystem, and exposes `/ready` to its health check.
+Compose binds only the API to `127.0.0.1:8080` on the host and stores PostgreSQL data in the `postgres-data` volume. PostgreSQL and Redis are reachable only on the Compose network. Put your HTTPS reverse proxy in front of the API port. The API container runs as a nonroot user with a read-only root filesystem and exposes `/ready` to its health check.
 
 ## API
 
@@ -97,10 +102,18 @@ Then query `GET /posts?category=Guides&featured=true`. The server generates a st
 If an earlier version saved `data/posts.json`, copy or back it up and import it before switching traffic:
 
 ```bash
-go run ./cmd/migrate-json -from data/posts.json -to data/blog.db
+BLOG_DATABASE_URL='postgres://blog:password@127.0.0.1:5432/blog?sslmode=disable' \
+  go run ./cmd/migrate-json -from data/posts.json
 ```
 
-The import runs in a transaction, skips slugs already in the database, and leaves the source JSON untouched. It is safe to rerun. Verify the imported count with `GET /admin/posts` before using the new server. If you need to roll back, stop the new server and run the old version against the original JSON file; edits made only in SQLite will need to be exported separately.
+For the Compose deployment, where PostgreSQL is not exposed to the host:
+
+```bash
+docker compose run --rm -v "$PWD/data/posts.json:/tmp/posts.json:ro" \
+  api /usr/local/bin/migrate-json -from /tmp/posts.json
+```
+
+The import runs in a transaction, skips slugs already in PostgreSQL, and leaves the source JSON untouched. It is safe to rerun. Verify the imported count with `GET /admin/posts` before switching traffic. If you need to roll back, stop the new server and run the old version against the original JSON file; edits made only in PostgreSQL will need to be exported separately.
 
 ## Operations and verification
 
@@ -110,4 +123,4 @@ go vet ./...
 go build -o blog-api-go ./cmd/api
 ```
 
-Back up the SQLite database with SQLite's online backup API or `VACUUM INTO` while the server is live; copying only the `.db` file during WAL activity can miss recent changes. Keep the `-wal` and `-shm` files with the database if taking a filesystem snapshot. The API logs structured request records without logging the admin token.
+Set `TEST_DATABASE_URL` and `TEST_REDIS_URL` to run integration tests against isolated PostgreSQL schemas and a namespaced Redis cache. CI starts both services and runs the full suite. Use `pg_dump` or a managed PostgreSQL backup for the database. Redis is disposable cache data. The API logs structured request records without logging the admin token.

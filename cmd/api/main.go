@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/M3264/blog-api-go/internal/cache"
 	"github.com/M3264/blog-api-go/internal/config"
 	"github.com/M3264/blog-api-go/internal/httpapi"
 	"github.com/M3264/blog-api-go/internal/storage"
@@ -29,14 +30,19 @@ func run(logger *slog.Logger) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	db, err := storage.Open(ctx, cfg.DBPath)
+	db, err := storage.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+	cacheClient, err := cache.Open(cfg.RedisURL, cfg.CachePrefix, logger)
+	if err != nil {
+		return err
+	}
+	defer cacheClient.Close()
 	server := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           httpapi.New(db, cfg.AdminToken, cfg.AllowedOrigin, logger),
+		Handler:           httpapi.New(db, cacheClient, cfg.AdminToken, cfg.AllowedOrigin, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

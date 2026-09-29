@@ -4,11 +4,17 @@ services:
     restart: unless-stopped
     environment:
       BLOG_ADMIN_TOKEN: ${BLOG_ADMIN_TOKEN:?set BLOG_ADMIN_TOKEN}
+      BLOG_DATABASE_URL: postgres://blog:${BLOG_DB_PASSWORD:?set BLOG_DB_PASSWORD}@postgres:5432/blog?sslmode=disable
+      BLOG_REDIS_URL: redis://redis:6379/0
+      BLOG_CACHE_PREFIX: ${BLOG_CACHE_PREFIX:-blog-api}
       BLOG_ALLOWED_ORIGIN: ${BLOG_ALLOWED_ORIGIN:-}
     ports:
       - "127.0.0.1:8080:8080"
-    volumes:
-      - blog-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     read_only: true
     tmpfs:
       - /tmp
@@ -23,5 +29,29 @@ services:
       retries: 3
       start_period: 10s
 
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: blog
+      POSTGRES_USER: blog
+      POSTGRES_PASSWORD: ${BLOG_DB_PASSWORD:?set BLOG_DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blog -d blog"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
-  blog-data:
+  postgres-data:
