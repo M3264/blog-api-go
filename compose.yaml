@@ -4,6 +4,7 @@ services:
     restart: unless-stopped
     environment:
       BLOG_ADMIN_TOKEN: ${BLOG_ADMIN_TOKEN:?set BLOG_ADMIN_TOKEN}
+      BLOG_ALLOW_SHORT_ADMIN_TOKEN: ${BLOG_ALLOW_SHORT_ADMIN_TOKEN:-false}
       BLOG_DATABASE_URL: postgres://blog:${BLOG_DB_PASSWORD:?set BLOG_DB_PASSWORD}@postgres:5432/blog?sslmode=disable
       BLOG_REDIS_URL: redis://redis:6379/0
       BLOG_CACHE_PREFIX: ${BLOG_CACHE_PREFIX:-blog-api}

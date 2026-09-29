@@ -7,13 +7,14 @@ import (
 )
 
 type Config struct {
-	Addr             string
-	DatabaseURL      string
-	RedisURL         string
-	CachePrefix      string
-	AdminToken       string
-	AllowedOrigin    string
-	EnablePlayground bool
+	Addr                 string
+	DatabaseURL          string
+	RedisURL             string
+	CachePrefix          string
+	AdminToken           string
+	AllowedOrigin        string
+	EnablePlayground     bool
+	AllowShortAdminToken bool
 }
 
 func Load() (Config, error) {
@@ -32,8 +33,18 @@ func Load() (Config, error) {
 		}
 		c.EnablePlayground = enabled
 	}
-	if len(c.AdminToken) < 32 {
+	if raw := os.Getenv("BLOG_ALLOW_SHORT_ADMIN_TOKEN"); raw != "" {
+		allowed, err := strconv.ParseBool(raw)
+		if err != nil {
+			return Config{}, errors.New("BLOG_ALLOW_SHORT_ADMIN_TOKEN must be true or false")
+		}
+		c.AllowShortAdminToken = allowed
+	}
+	if len(c.AdminToken) < 32 && !c.AllowShortAdminToken {
 		return Config{}, errors.New("BLOG_ADMIN_TOKEN must be at least 32 characters")
+	}
+	if c.AdminToken == "" {
+		return Config{}, errors.New("BLOG_ADMIN_TOKEN is required")
 	}
 	if c.DatabaseURL == "" {
 		return Config{}, errors.New("BLOG_DATABASE_URL is required")

@@ -40,6 +40,7 @@ go build -o blog-api-go ./cmd/api
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `BLOG_ADMIN_TOKEN` | required | At least 32 characters; bearer token for editor routes |
+| `BLOG_ALLOW_SHORT_ADMIN_TOKEN` | `false` | Permit a shorter token for local testing |
 | `BLOG_ADDR` | `127.0.0.1:8080` | Listening address |
 | `BLOG_DATABASE_URL` | required | PostgreSQL connection URL |
 | `BLOG_REDIS_URL` | empty | Redis connection URL; empty disables cache |
@@ -48,6 +49,8 @@ go build -o blog-api-go ./cmd/api
 | `BLOG_ENABLE_PLAYGROUND` | `false` | Serve the browser playground at `/playground/` |
 
 The token is read at startup. Change it and restart the server to rotate it. Protect admin requests with HTTPS when the API is reachable outside localhost.
+
+For a local browser test with a shorter token, set `BLOG_ALLOW_SHORT_ADMIN_TOKEN=true`. Keep the default `false` for a deployed editor. If you run the Go binary on the host while PostgreSQL and Redis run in Compose, use `docker compose -f compose.yaml -f compose.local.yaml up -d postgres redis` to bind their ports to localhost.
 
 ## Run with Docker Compose
 

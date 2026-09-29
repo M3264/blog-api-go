@@ -1,5 +1,6 @@
 data/
 blog-api-go
+bin/
 .env
 *.db
 *.db-shm
