@@ -8,6 +8,8 @@ const state = {
   selectedSlug: null,
   selectedStatus: 'draft',
   requests: [],
+  dirty: false,
+  loadingPosts: 0,
 };
 
 class APIError extends Error {
@@ -108,6 +110,8 @@ function showResponse(result) {
 }
 
 function navigate(section) {
+  if (state.dirty && !confirm('Leave this article with unsaved changes?')) return false;
+  state.dirty = false;
   if (location.pathname.startsWith('/stories/')) {
     location.assign(`/${section === 'explore' ? '' : `#${section}`}`);
     return;
@@ -116,9 +120,13 @@ function navigate(section) {
     $(`#${name}Panel`).hidden = name !== section;
     $$(`[data-nav="${name}"]`).forEach((item) => item.classList.toggle('active', name === section));
   });
-  history.replaceState(null, '', section === 'explore' ? '/' : `/#${section}`);
+  history.replaceState(null, '', `/${location.search}${section === 'explore' ? '' : '#' + section}`);
   if (section === 'editor' && state.token) loadAdminPosts();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: motionBehavior() });
+  const heading = $(`#${section}Panel h1`);
+  heading.tabIndex = -1;
+  heading.focus({ preventScroll: true });
+  return true;
 }
 
 async function health() {
@@ -168,7 +176,7 @@ async function loadSummary() {
         $('#categoryFilter').value = item.name;
         state.page = 0;
         loadPosts();
-        $('#latest').scrollIntoView({ behavior: 'smooth' });
+        $('#latest').scrollIntoView({ behavior: motionBehavior() });
       });
       topicList.append(button);
     });
@@ -177,13 +185,22 @@ async function loadSummary() {
   }
 }
 
+function motionBehavior() { return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'; }
+
 async function loadPosts() {
+  const requestID = ++state.loadingPosts;
   const params = new URLSearchParams({ limit: '9', offset: String(state.page * 9) });
   const q = $('#searchInput').value.trim();
   if (q) params.set('q', q);
   if ($('#categoryFilter').value) params.set('category', $('#categoryFilter').value);
   if ($('#tagFilter').value) params.set('tag', $('#tagFilter').value);
   if ($('#featuredFilter').checked) params.set('featured', 'true');
+  if (!location.pathname.startsWith('/stories/')) {
+    const query = new URLSearchParams(params);
+    query.delete('limit');
+    if (query.get('offset') === '0') query.delete('offset');
+    history.replaceState(null, '', `/${query.size ? '?' + query : ''}${location.hash}`);
+  }
   const grid = $('#postGrid');
   grid.replaceChildren();
   $('#leadPost').replaceChildren();
@@ -193,6 +210,7 @@ async function loadPosts() {
   grid.append(loading);
   try {
     const result = await api('GET', `/posts?${params}`);
+    if (requestID !== state.loadingPosts) return;
     state.total = result.data.total;
     renderPosts(result.data.posts);
     const start = state.total ? state.page * 9 + 1 : 0;
@@ -201,6 +219,7 @@ async function loadPosts() {
     $('#previousPage').disabled = state.page === 0;
     $('#nextPage').disabled = (state.page + 1) * 9 >= state.total;
   } catch (error) {
+    if (requestID !== state.loadingPosts) return;
     grid.replaceChildren();
     const message = document.createElement('div');
     message.className = 'empty-state';
@@ -225,9 +244,9 @@ function renderPosts(posts) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
     const title = document.createElement('strong');
-    title.textContent = state.total ? 'No more articles here.' : 'Nothing published here yet.';
+    title.textContent = state.total ? 'No more articles here.' : 'No matching articles.';
     const copy = document.createElement('p');
-    copy.textContent = 'Try another filter or create your first post in the Editor.';
+    copy.textContent = 'Try a different search or choose another topic.';
     empty.append(title, copy);
     grid.append(empty);
     return;
@@ -259,9 +278,13 @@ function renderPosts(posts) {
       const media = document.createElement('div');
       media.className = 'lead-media';
       const image = document.createElement('img');
+      image.width = 1200;
+      image.height = 675;
+      image.decoding = 'async';
       image.src = post.cover_image;
       image.alt = '';
       image.addEventListener('error', () => { media.remove(); lead.classList.remove('has-image'); });
+      image.fetchPriority = 'high';
       media.append(image);
       lead.append(media);
     }
@@ -292,6 +315,9 @@ function renderPosts(posts) {
     if (post.cover_image) {
       const image = document.createElement('img');
       image.className = 'post-row-media';
+      image.width = 1200;
+      image.height = 675;
+      image.decoding = 'async';
       image.src = post.cover_image;
       image.alt = '';
       image.loading = 'lazy';
@@ -344,12 +370,16 @@ async function loadArticlePage(slug) {
     summary.textContent = post.summary;
     const meta = document.createElement('div');
     meta.className = 'article-meta';
-    meta.textContent = `${post.author || 'Editorial Team'} · ${formatDate(post.published_at || post.created_at)}`;
+    const minutes = Math.max(1, Math.ceil(post.body.trim().split(/\s+/).length / 220));
+    meta.textContent = `${post.author || 'Editorial Team'} · ${formatDate(post.published_at || post.created_at)} · ${minutes} min read`;
     header.append(category, title, summary, meta);
     root.append(header);
     if (post.cover_image) {
       const image = document.createElement('img');
       image.className = 'article-cover';
+      image.width = 1200;
+      image.height = 675;
+      image.decoding = 'async';
       image.src = post.cover_image;
       image.alt = '';
       image.addEventListener('error', () => image.remove());
@@ -414,6 +444,8 @@ function resetEditor() {
   state.selectedSlug = null;
   state.selectedStatus = 'draft';
   $('#editorForm').reset();
+  state.dirty = false;
+  $('#editorError').textContent = '';
   $('#editorMode').textContent = 'NEW ARTICLE';
   $('#postStatusBadge').textContent = 'DRAFT';
   $('#postStatusBadge').className = 'post-status';
@@ -424,6 +456,8 @@ function resetEditor() {
 }
 
 function populateEditor(post) {
+  state.dirty = false;
+  $('#editorError').textContent = '';
   state.selectedSlug = post.slug;
   state.selectedStatus = post.status;
   const form = $('#editorForm');
@@ -460,6 +494,7 @@ async function connectToken() {
 }
 
 function disconnectToken() {
+  if (state.dirty && !confirm('Disconnect and discard unsaved changes?')) return;
   state.token = '';
   resetEditor();
   $('#adminList').textContent = 'Connect to load posts.';
@@ -504,6 +539,7 @@ async function loadAdminPosts() {
 }
 
 async function loadEditorPost(slug) {
+  if (state.dirty && !confirm('Discard unsaved changes and open another article?')) return;
   try {
     const { data } = await api('GET', `/admin/posts/${encodeURIComponent(slug)}`, { auth: true });
     populateEditor(data);
@@ -527,8 +563,11 @@ function editorPayload(status) {
 }
 
 async function savePost(status) {
-  if (!state.token) { toast('Connect the editor token first.', true); return; }
+  if (!state.token) { $('#editorError').textContent = 'Connect your editor token before saving.'; $('#tokenInput').focus(); return; }
   if (!$('#editorForm').reportValidity()) return;
+  const buttons = [$('#saveDraft'), $('#publishPost')];
+  buttons.forEach(button => { button.disabled = true; button.setAttribute('aria-busy', 'true'); });
+  $('#editorError').textContent = 'Saving…';
   const payload = editorPayload(status);
   const method = state.selectedSlug ? 'PATCH' : 'POST';
   const path = state.selectedSlug ? `/admin/posts/${encodeURIComponent(state.selectedSlug)}` : '/admin/posts';
@@ -537,7 +576,8 @@ async function savePost(status) {
     populateEditor(data);
     toast(status === 'published' ? 'Article published.' : 'Draft saved.');
     await Promise.all([loadAdminPosts(), loadPosts(), loadSummary()]);
-  } catch (error) { toast(error.message, true); }
+  } catch (error) { $('#editorError').textContent = `${error.message} Check your connection and try saving again.`; }
+  finally { buttons.forEach(button => { button.disabled = false; button.removeAttribute('aria-busy'); }); }
 }
 
 async function deletePost() {
@@ -570,15 +610,22 @@ async function sendConsoleRequest(event) {
 }
 
 function bindEvents() {
-  $$('[data-nav]').forEach((button) => button.addEventListener('click', () => navigate(button.dataset.nav)));
+  $$('[data-nav]').forEach((button) => button.addEventListener('click', (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault(); navigate(button.dataset.nav);
+  }));
+  $('#editorForm').addEventListener('input', () => { state.dirty = true; });
+  window.addEventListener('beforeunload', (event) => { if (state.dirty) { event.preventDefault(); event.returnValue = ''; } });
+  window.addEventListener('hashchange', () => { if (!location.pathname.startsWith('/stories/')) navigate(['#editor', '#console'].includes(location.hash) ? location.hash.slice(1) : 'explore'); });
   $$('a[href="#latest"], a[href="#browse"]').forEach((link) => link.addEventListener('click', (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     if (location.pathname.startsWith('/stories/')) {
       location.assign(`/${link.getAttribute('href')}`);
       return;
     }
-    navigate('explore');
-    setTimeout(() => $(link.getAttribute('href')).scrollIntoView({ behavior: 'smooth' }), 0);
+    if (!navigate('explore')) return;
+    setTimeout(() => $(link.getAttribute('href')).scrollIntoView({ behavior: motionBehavior() }), 0);
   }));
   $('#refreshPublic').addEventListener('click', () => { health(); loadSummary(); loadPosts(); });
   $('#filters').addEventListener('submit', (event) => event.preventDefault());
@@ -592,7 +639,7 @@ function bindEvents() {
   $('#disconnectToken').addEventListener('click', disconnectToken);
   $('#refreshAdmin').addEventListener('click', loadAdminPosts);
   $('#adminStatusFilter').addEventListener('change', loadAdminPosts);
-  $('#newPost').addEventListener('click', resetEditor);
+  $('#newPost').addEventListener('click', () => { if (!state.dirty || confirm('Discard unsaved changes and start a new article?')) resetEditor(); });
   $('#editorForm').addEventListener('submit', (event) => event.preventDefault());
   $('#saveDraft').addEventListener('click', () => savePost('draft'));
   $('#publishPost').addEventListener('click', () => savePost('published'));
@@ -609,6 +656,13 @@ if (articleMatch) {
   loadArticlePage(articleMatch[1]);
 } else {
   if (location.hash === '#editor' || location.hash === '#console') navigate(location.hash.slice(1));
-  loadSummary();
-  loadPosts();
+  const query = new URLSearchParams(location.search);
+  $('#searchInput').value = query.get('q') || '';
+  $('#featuredFilter').checked = query.get('featured') === 'true';
+  state.page = Math.max(0, Math.floor((Number(query.get('offset')) || 0) / 9));
+  loadSummary().then(() => {
+    $('#categoryFilter').value = query.get('category') || '';
+    $('#tagFilter').value = query.get('tag') || '';
+    loadPosts();
+  });
 }
